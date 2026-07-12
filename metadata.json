@@ -1,0 +1,6 @@
+{
+  "name": "Personalizador de Festas e Painéis",
+  "description": "Pesquise temas, gere painéis com IA, simule decorações em 3D e crie apresentações e orçamentos profissionais para clientes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
