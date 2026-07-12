@@ -1059,4 +1059,8 @@ Garanta que as cores hexadecimais sejam válidas (ex: "#FF5733"). Retorne apenas
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on 
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();
