@@ -6,8 +6,146 @@
 import React from "react";
 import { PartySetupState, ThemeConfig, PanelItem, BalloonItem, CakeStandItem } from "../types";
 import { motion } from "motion/react";
-import { Info, Sparkles, Move, ZoomIn, ZoomOut, Grid, RotateCw, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Hand } from "lucide-react";
+import { Info, Sparkles, Move, ZoomIn, ZoomOut, Grid, RotateCw, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Hand, Camera, Download, Share2, Send, Check, Loader2, X, SeparatorVertical } from "lucide-react";
+import html2canvas from "html2canvas";
 import { getActivePanels, getPanelImage, getActiveBalloons } from "../utils";
+
+const getProxiedUrl = (url: string): string => {
+  if (!url) return "";
+  if (
+    url.startsWith("data:") ||
+    url.startsWith("/") ||
+    url.startsWith("./") ||
+    url.startsWith("blob:") ||
+    url.includes("/api/proxy-image")
+  ) {
+    return url;
+  }
+  return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+};
+
+function oklchToRgb(lStr: string, cStr: string, hStr: string, aStr?: string): string {
+  let L = parseFloat(lStr);
+  let C = parseFloat(cStr);
+  let H = parseFloat(hStr);
+  let alpha = aStr ? parseFloat(aStr) : 1;
+
+  if (lStr.includes("%")) L = parseFloat(lStr) / 100;
+  if (hStr.includes("deg")) H = parseFloat(hStr);
+  // Convert H from degrees to radians
+  H = (H * Math.PI) / 180;
+
+  // OKLCH to OKLAB
+  const a = C * Math.cos(H);
+  const b = C * Math.sin(H);
+
+  // OKLAB to LMS
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+
+  // LMS to Linear sRGB
+  const l = l_ * l_ * l_;
+  const m = m_ * m_ * m_;
+  const s = s_ * s_ * s_;
+
+  // Linear sRGB to sRGB
+  let r = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  let bl = -0.0041960863 * l - 0.7034186145 * m + 1.7076147010 * s;
+
+  // Gamma correction
+  const f = (c: number) => {
+    return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  };
+
+  const R = Math.min(255, Math.max(0, Math.round(f(r) * 255)));
+  const G = Math.min(255, Math.max(0, Math.round(f(g) * 255)));
+  const B = Math.min(255, Math.max(0, Math.round(f(bl) * 255)));
+
+  if (aStr) {
+    return `rgba(${R}, ${G}, ${B}, ${alpha})`;
+  }
+  return `rgb(${R}, ${G}, ${B})`;
+}
+
+function oklabToRgb(lStr: string, aStr: string, bStr: string, alphaStr?: string): string {
+  let L = parseFloat(lStr);
+  let a = parseFloat(aStr);
+  let b = parseFloat(bStr);
+  let alpha = alphaStr ? parseFloat(alphaStr) : 1;
+
+  if (lStr.includes("%")) L = parseFloat(lStr) / 100;
+
+  // OKLAB to LMS
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+
+  // LMS to Linear sRGB
+  const l = l_ * l_ * l_;
+  const m = m_ * m_ * m_;
+  const s = s_ * s_ * s_;
+
+  // Linear sRGB to sRGB
+  let r = +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s;
+  let g = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s;
+  let bl = -0.0041960863 * l - 0.7034186145 * m + 1.7076147010 * s;
+
+  // Gamma correction
+  const f = (c: number) => {
+    return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  };
+
+  const R = Math.min(255, Math.max(0, Math.round(f(r) * 255)));
+  const G = Math.min(255, Math.max(0, Math.round(f(g) * 255)));
+  const B = Math.min(255, Math.max(0, Math.round(f(bl) * 255)));
+
+  if (alphaStr) {
+    return `rgba(${R}, ${G}, ${B}, ${alpha})`;
+  }
+  return `rgb(${R}, ${G}, ${B})`;
+}
+
+const replaceOklchWithRgb = (cssText: string): string => {
+  if (!cssText) return "";
+  
+  // 1. Convert oklch
+  let result = cssText.replace(/oklch\(([^)]+)\)/g, (match, p1) => {
+    try {
+      const parts = p1.trim().split(/[\s,/]+/);
+      if (parts.length >= 3) {
+        const l = parts[0];
+        const c = parts[1];
+        const h = parts[2];
+        const a = parts[3] || undefined;
+        return oklchToRgb(l, c, h, a);
+      }
+    } catch (e) {
+      console.warn("Error converting OKLCH color:", match, e);
+    }
+    return "rgb(15, 23, 42)";
+  });
+
+  // 2. Convert oklab
+  result = result.replace(/oklab\(([^)]+)\)/g, (match, p1) => {
+    try {
+      const parts = p1.trim().split(/[\s,/]+/);
+      if (parts.length >= 3) {
+        const l = parts[0];
+        const aVal = parts[1];
+        const bVal = parts[2];
+        const alpha = parts[3] || undefined;
+        return oklabToRgb(l, aVal, bVal, alpha);
+      }
+    } catch (e) {
+      console.warn("Error converting OKLAB color:", match, e);
+    }
+    return "rgb(15, 23, 42)";
+  });
+
+  return result;
+};
 
 const CakeStand = ({ color, width, hasCake, isIndependent }: { color: string; width: number; hasCake?: boolean; isIndependent?: boolean }) => {
   const adjustColor = (hex: string, percent: number) => {
@@ -247,7 +385,7 @@ interface PartyMockupProps {
 
 export default function PartyMockup({ state, activeTheme, onUpdateState }: PartyMockupProps) {
   // Select active background image (preset or custom generated by AI)
-  const backdropImage = state.customBackdropUrl || activeTheme.backdropUrl;
+  const backdropImage = getProxiedUrl(state.customBackdropUrl || activeTheme.backdropUrl);
 
   const [zoom, setZoom] = React.useState<number>(1.0);
   const stageRef = React.useRef<HTMLDivElement>(null);
@@ -283,9 +421,250 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     setPanY(0);
   }, []);
 
+  const [isExporting, setIsExporting] = React.useState<boolean>(false);
+  const [exportStatus, setExportStatus] = React.useState<string | null>(null);
+  const [exportedImgUrl, setExportedImgUrl] = React.useState<string | null>(null);
+  const [showExportModal, setShowExportModal] = React.useState<boolean>(false);
+
   React.useEffect(() => {
     handleResetCamera();
   }, [handleResetCamera]);
+
+  const handleExportImage = async (directDownload: boolean = false) => {
+    if (!stageRef.current) return;
+
+    // Desmarca itens selecionados para a foto ficar impecável e limpa
+    onUpdateState({
+      selectedPanelId: null,
+      selectedBalloonId: null,
+      selectedCylinderIndex: null,
+      selectedCakeStandId: null,
+      isTextSelected: false,
+      gridVisible: false // oculta também as medidas para realismo absoluto
+    });
+
+    setIsExporting(true);
+    setExportStatus(directDownload ? "Gerando e baixando imagem da maquete..." : "Fotografando o cenário em alta definição...");
+    setShowExportModal(true);
+
+    setTimeout(async () => {
+      const originalGetComputedStyle = window.getComputedStyle;
+      
+      // Save original styles of all <style> elements in the parent document to temporarily sanitize OKLCH
+      const styleElements = Array.from(document.querySelectorAll("style"));
+      const originalStyles = styleElements.map(el => ({
+        element: el,
+        originalHTML: el.innerHTML
+      }));
+
+      try {
+        const stage = stageRef.current;
+        if (!stage) return;
+
+        // Temporarily replace OKLCH and OKLAB with RGB in all parent document style elements to bypass html2canvas's CSS parser crashes
+        styleElements.forEach(el => {
+          if (el.innerHTML && (el.innerHTML.includes("oklch") || el.innerHTML.includes("oklab"))) {
+            el.innerHTML = replaceOklchWithRgb(el.innerHTML);
+          }
+        });
+
+        // Override main window's getComputedStyle to prevent oklch/oklab color parsing errors
+        window.getComputedStyle = function (el, pseudoElt) {
+          const style = originalGetComputedStyle.call(this, el, pseudoElt);
+          return new Proxy(style, {
+            get(target, prop) {
+              if (prop === "getPropertyValue") {
+                return function (propertyName: string) {
+                  const val = target.getPropertyValue(propertyName);
+                  if (typeof val === "string" && (val.includes("oklch") || val.includes("oklab"))) {
+                    return replaceOklchWithRgb(val);
+                  }
+                  return val;
+                };
+              }
+              const val = Reflect.get(target, prop);
+              if (typeof val === "string" && (val.includes("oklch") || val.includes("oklab"))) {
+                return replaceOklchWithRgb(val);
+              }
+              if (typeof val === "function") {
+                return val.bind(target);
+              }
+              return val;
+            }
+          });
+        };
+
+        const isMobileDevice = typeof window !== "undefined" && window.innerWidth < 768;
+        // Captura a div do palco com html2canvas
+        // Habilita CORS para poder baixar imagens customizadas de fundos que o usuário colou
+        const canvas = await html2canvas(stage, {
+          useCORS: true,
+          allowTaint: false,
+          backgroundColor: "#020617", // slate-950 background
+          logging: true,
+          scale: isMobileDevice ? 2.0 : 3.0, // Escalonamento de alta definição (3x em desktop, 2x em celular para garantir máxima nitidez na apresentação do projeto)
+          scrollX: 0,
+          scrollY: -window.scrollY, // Corrige o deslocamento de rolagem da tela (frequentemente causa canvas em branco)
+          onclone: (clonedDoc) => {
+            // Also override cloned window's getComputedStyle to prevent oklch color parsing errors
+            const clonedWin = clonedDoc.defaultView;
+            if (clonedWin) {
+              const origClonedGetComputedStyle = clonedWin.getComputedStyle;
+              clonedWin.getComputedStyle = function (el, pseudoElt) {
+                const style = origClonedGetComputedStyle.call(this, el, pseudoElt);
+                return new Proxy(style, {
+                  get(target, prop) {
+                    if (prop === "getPropertyValue") {
+                      return function (propertyName: string) {
+                        const val = target.getPropertyValue(propertyName);
+                        if (typeof val === "string" && (val.includes("oklch") || val.includes("oklab"))) {
+                          return replaceOklchWithRgb(val);
+                        }
+                        return val;
+                      };
+                    }
+                    const val = Reflect.get(target, prop);
+                    if (typeof val === "string" && (val.includes("oklch") || val.includes("oklab"))) {
+                      return replaceOklchWithRgb(val);
+                    }
+                    if (typeof val === "function") {
+                      return val.bind(target);
+                    }
+                    return val;
+                  }
+                });
+              };
+            }
+
+            // 1. Process inline styles of all elements in the cloned document
+            const allElements = clonedDoc.getElementsByTagName("*");
+            for (let i = 0; i < allElements.length; i++) {
+              const el = allElements[i] as HTMLElement;
+              const styleAttr = el.getAttribute ? el.getAttribute("style") : null;
+              if (styleAttr && (styleAttr.includes("oklch") || styleAttr.includes("oklab"))) {
+                el.setAttribute("style", replaceOklchWithRgb(styleAttr));
+              }
+            }
+
+            // 2. Build a single, unified stylesheet of all parent styles, with oklch replaced
+            let unifiedCss = "";
+            try {
+              for (let i = 0; i < document.styleSheets.length; i++) {
+                const sheet = document.styleSheets[i];
+                try {
+                  const rules = sheet.cssRules || sheet.rules;
+                  if (rules) {
+                    for (let r = 0; r < rules.length; r++) {
+                      unifiedCss += rules[r].cssText + "\n";
+                    }
+                  }
+                } catch (rulesErr) {
+                  // Ignore CORS stylesheet errors
+                }
+              }
+            } catch (err) {
+              console.warn("Error reading stylesheets during clone:", err);
+            }
+
+            // Remove all existing <style> and <link rel="stylesheet"> tags from cloned document to avoid duplicates or crashes
+            const existingStyles = Array.from(clonedDoc.getElementsByTagName("style"));
+            existingStyles.forEach(s => s.remove());
+            
+            const existingLinks = Array.from(clonedDoc.getElementsByTagName("link"));
+            existingLinks.forEach(l => {
+              if (l.rel === "stylesheet") l.remove();
+            });
+
+            // If we successfully retrieved parent CSS rules, inject them with oklch replaced
+            if (unifiedCss) {
+              const cleanCss = replaceOklchWithRgb(unifiedCss);
+              const styleTag = clonedDoc.createElement("style");
+              styleTag.innerHTML = cleanCss;
+              clonedDoc.head.appendChild(styleTag);
+            } else {
+              // Fallback: if we couldn't read style rules, just replace in existing style tags of cloned document
+              existingStyles.forEach(styleEl => {
+                const clean = replaceOklchWithRgb(styleEl.innerHTML);
+                const clone = clonedDoc.createElement("style");
+                clone.innerHTML = clean;
+                clonedDoc.head.appendChild(clone);
+              });
+            }
+          }
+        });
+
+        // Convert the final high-definition screenshot to JPEG format
+        const imgData = canvas.toDataURL("image/jpeg", 0.95);
+        setExportedImgUrl(imgData);
+        setExportStatus(null);
+
+        if (directDownload) {
+          const link = document.createElement("a");
+          link.href = imgData;
+          link.download = `maquete-decoracao-festa-${new Date().toISOString().slice(0,10)}.jpg`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          // Close modal automatically after 1.5s
+          setExportStatus("Download concluído com sucesso! 🎉");
+          setTimeout(() => {
+            setShowExportModal(false);
+            setExportedImgUrl(null);
+            setExportStatus(null);
+          }, 1500);
+        }
+      } catch (err) {
+        console.error("Erro ao exportar a imagem da maquete:", err);
+        setExportStatus("Ocorreu um erro ao gerar a maquete. Tente salvar novamente.");
+      } finally {
+        // Restore original style tags in the parent document to keep state pristine
+        try {
+          originalStyles.forEach(item => {
+            item.element.innerHTML = item.originalHTML;
+          });
+        } catch (restoreErr) {
+          console.warn("Could not restore original style elements:", restoreErr);
+        }
+
+        window.getComputedStyle = originalGetComputedStyle;
+        setIsExporting(false);
+      }
+    }, 500);
+  };
+
+  const handleShareImage = async () => {
+    if (!exportedImgUrl) return;
+    try {
+      const response = await fetch(exportedImgUrl);
+      const blob = await response.blob();
+      const file = new File([blob], "maquete-decoracao-festa.jpg", { type: "image/jpeg" });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Maquete de Decoração de Festa",
+          text: "Confira a maquete de decoração criada no decorador interativo! ✨",
+        });
+      } else if (navigator.share) {
+        await navigator.share({
+          title: "Maquete de Decoração de Festa",
+          text: "Confira a maquete de decoração criada no decorador interativo! Acesse e veja.",
+        });
+      } else {
+        // Envio simples via link para WhatsApp Web/App com instrução
+        const shareText = "Olá! Acabei de gerar a maquete do projeto de decoração da sua festa! Baixei a foto e estou te enviando para análise. ✨";
+        const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+        window.open(whatsappUrl, "_blank");
+      }
+    } catch (err) {
+      console.error("Erro ao compartilhar:", err);
+      // Fallback
+      const shareText = "Olá! Veja a maquete do projeto da sua festa! ✨";
+      const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+      window.open(whatsappUrl, "_blank");
+    }
+  };
 
   const handleStagePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // Ignore touch pointer types as we handle touch gestures natively
@@ -505,6 +884,57 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     startH: number;
   } | null>(null);
 
+  const [activeNeonNumberDrag, setActiveNeonNumberDrag] = React.useState<{
+    numId: string;
+    startX: number;
+    startY: number;
+    startNumX: number;
+    startNumY: number;
+  } | null>(null);
+
+  const [activeNeonNumberResize, setActiveNeonNumberResize] = React.useState<{
+    numId: string;
+    type: "width" | "height" | "diagonal";
+    startX: number;
+    startY: number;
+    startW: number;
+    startH: number;
+  } | null>(null);
+
+  const [activeLadderShelfDrag, setActiveLadderShelfDrag] = React.useState<{
+    ladderId: string;
+    startX: number;
+    startY: number;
+    startLadderX: number;
+    startLadderY: number;
+  } | null>(null);
+
+  const [activeLadderShelfResize, setActiveLadderShelfResize] = React.useState<{
+    ladderId: string;
+    type: "width" | "height" | "diagonal";
+    startX: number;
+    startY: number;
+    startW: number;
+    startH: number;
+  } | null>(null);
+
+  const [activeTrayDrag, setActiveTrayDrag] = React.useState<{
+    trayId: string;
+    startX: number;
+    startY: number;
+    startTrayX: number;
+    startTrayY: number;
+  } | null>(null);
+
+  const [activeTrayResize, setActiveTrayResize] = React.useState<{
+    trayId: string;
+    type: "width" | "height" | "diagonal";
+    startX: number;
+    startY: number;
+    startW: number;
+    startH: number;
+  } | null>(null);
+
   const [activeTextDrag, setActiveTextDrag] = React.useState<{
     startX: number;
     startY: number;
@@ -529,6 +959,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       selectedBalloonId: null, 
       selectedPanelId: null, 
       selectedCylinderIndex: null,
+      selectedNeonNumberId: null,
       isTextSelected: false
     });
 
@@ -607,7 +1038,8 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       selectedCakeStandId: standId, 
       selectedBalloonId: null, 
       selectedPanelId: null, 
-      selectedCylinderIndex: null 
+      selectedCylinderIndex: null,
+      selectedNeonNumberId: null
     });
 
     const stands = state.cakeStands || [];
@@ -626,6 +1058,245 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     e.currentTarget.setPointerCapture(e.pointerId);
   };
 
+  // Neon number handlers
+  const handleNeonNumberPointerDown = (numId: string, e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest(".resize-handle") || (e.target as HTMLElement).closest(".delete-btn")) return;
+    e.preventDefault();
+    onUpdateState({ 
+      selectedNeonNumberId: numId,
+      selectedCakeStandId: null, 
+      selectedBalloonId: null, 
+      selectedPanelId: null, 
+      selectedCylinderIndex: null,
+      isTextSelected: false
+    });
+
+    const numbers = state.neonNumbers || [];
+    const num = numbers.find(n => n.id === numId);
+    if (!num) return;
+
+    setActiveNeonNumberDrag({
+      numId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startNumX: num.x,
+      startNumY: num.y
+    });
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleNeonNumberPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const numbers = state.neonNumbers || [];
+
+    if (activeNeonNumberDrag) {
+      const { numId, startX, startY, startNumX, startNumY } = activeNeonNumberDrag;
+      const num = numbers.find(n => n.id === numId);
+      if (!num) return;
+
+      const dx = (e.clientX - startX) / zoom;
+      const dy = (e.clientY - startY) / zoom;
+
+      const nextX = Math.max(-200, Math.min(450, startNumX + dx));
+      const nextY = Math.max(-100, Math.min(400, startNumY - dy));
+
+      const updated = numbers.map(n => n.id === numId ? { ...n, x: nextX, y: nextY } : n);
+      onUpdateState({ neonNumbers: updated });
+    } else if (activeNeonNumberResize) {
+      const { numId, type, startX, startY, startW, startH } = activeNeonNumberResize;
+      const num = numbers.find(n => n.id === numId);
+      if (!num) return;
+
+      const dx = (e.clientX - startX) / zoom;
+      const dy = (e.clientY - startY) / zoom;
+
+      let newW = num.w;
+      let newH = num.h;
+
+      if (type === "width") {
+        newW = Math.max(30, Math.min(300, startW + dx));
+      } else if (type === "height") {
+        newH = Math.max(30, Math.min(400, startH - dy));
+      } else if (type === "diagonal") {
+        const ratio = (startW + dx) / startW;
+        newW = Math.max(30, Math.min(300, startW + dx));
+        newH = Math.max(30, Math.min(400, startH * ratio));
+      }
+
+      const updated = numbers.map(n => n.id === numId ? { ...n, w: newW, h: newH } : n);
+      onUpdateState({ neonNumbers: updated });
+    }
+  };
+
+  const handleNeonNumberPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeNeonNumberDrag) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      setActiveNeonNumberDrag(null);
+    }
+    if (activeNeonNumberResize) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      setActiveNeonNumberResize(null);
+    }
+  };
+
+  const handleNeonNumberResizePointerDown = (numId: string, type: "width" | "height" | "diagonal", e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onUpdateState({ 
+      selectedNeonNumberId: numId,
+      selectedCakeStandId: null, 
+      selectedBalloonId: null, 
+      selectedPanelId: null, 
+      selectedCylinderIndex: null 
+    });
+
+    const numbers = state.neonNumbers || [];
+    const num = numbers.find(n => n.id === numId);
+    if (!num) return;
+
+    setActiveNeonNumberResize({
+      numId,
+      type,
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: num.w,
+      startH: num.h
+    });
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleDeleteNeonNumber = (numId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const numbers = state.neonNumbers || [];
+    const updated = numbers.filter(n => n.id !== numId);
+    onUpdateState({ 
+      neonNumbers: updated,
+      selectedNeonNumberId: state.selectedNeonNumberId === numId ? null : state.selectedNeonNumberId
+    });
+  };
+
+  // Display ladder shelf handlers
+  const handleLadderShelfPointerDown = (ladderId: string, e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest(".resize-handle") || (e.target as HTMLElement).closest(".delete-btn")) return;
+    e.preventDefault();
+    onUpdateState({ 
+      selectedLadderShelfId: ladderId,
+      selectedNeonNumberId: null,
+      selectedCakeStandId: null, 
+      selectedBalloonId: null, 
+      selectedPanelId: null, 
+      selectedCylinderIndex: null,
+      isTextSelected: false
+    });
+
+    const ladders = state.ladderShelves || [];
+    const ladder = ladders.find(l => l.id === ladderId);
+    if (!ladder) return;
+
+    setActiveLadderShelfDrag({
+      ladderId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startLadderX: ladder.x,
+      startLadderY: ladder.y
+    });
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleLadderShelfPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const ladders = state.ladderShelves || [];
+
+    if (activeLadderShelfDrag) {
+      const { ladderId, startX, startY, startLadderX, startLadderY } = activeLadderShelfDrag;
+      const ladder = ladders.find(l => l.id === ladderId);
+      if (!ladder) return;
+
+      const dx = (e.clientX - startX) / zoom;
+      const dy = (e.clientY - startY) / zoom;
+
+      const nextX = Math.max(-200, Math.min(450, startLadderX + dx));
+      const nextY = Math.max(-100, Math.min(400, startLadderY - dy));
+
+      const updated = ladders.map(l => l.id === ladderId ? { ...l, x: nextX, y: nextY } : l);
+      onUpdateState({ ladderShelves: updated });
+    } else if (activeLadderShelfResize) {
+      const { ladderId, type, startX, startY, startW, startH } = activeLadderShelfResize;
+      const ladder = ladders.find(l => l.id === ladderId);
+      if (!ladder) return;
+
+      const dx = (e.clientX - startX) / zoom;
+      const dy = (e.clientY - startY) / zoom;
+
+      let newW = ladder.w;
+      let newH = ladder.h;
+
+      if (type === "width") {
+        newW = Math.max(40, Math.min(250, startW + dx));
+      } else if (type === "height") {
+        newH = Math.max(40, Math.min(350, startH - dy));
+      } else if (type === "diagonal") {
+        const ratio = (startW + dx) / startW;
+        newW = Math.max(40, Math.min(250, startW + dx));
+        newH = Math.max(40, Math.min(350, startH * ratio));
+      }
+
+      const updated = ladders.map(l => l.id === ladderId ? { ...l, w: newW, h: newH } : l);
+      onUpdateState({ ladderShelves: updated });
+    }
+  };
+
+  const handleLadderShelfPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeLadderShelfDrag) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      setActiveLadderShelfDrag(null);
+    }
+    if (activeLadderShelfResize) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      setActiveLadderShelfResize(null);
+    }
+  };
+
+  const handleLadderShelfResizePointerDown = (ladderId: string, type: "width" | "height" | "diagonal", e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onUpdateState({ 
+      selectedLadderShelfId: ladderId,
+      selectedNeonNumberId: null,
+      selectedCakeStandId: null, 
+      selectedBalloonId: null, 
+      selectedPanelId: null, 
+      selectedCylinderIndex: null,
+      isTextSelected: false
+    });
+
+    const ladders = state.ladderShelves || [];
+    const ladder = ladders.find(l => l.id === ladderId);
+    if (!ladder) return;
+
+    setActiveLadderShelfResize({
+      ladderId,
+      type,
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: ladder.w,
+      startH: ladder.h
+    });
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleDeleteLadderShelf = (ladderId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ladders = state.ladderShelves || [];
+    const updated = ladders.filter(l => l.id !== ladderId);
+    onUpdateState({ 
+      ladderShelves: updated,
+      selectedLadderShelfId: state.selectedLadderShelfId === ladderId ? null : state.selectedLadderShelfId
+    });
+  };
+
   const handleDeleteCakeStand = (standId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const stands = state.cakeStands || [];
@@ -633,6 +1304,129 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     onUpdateState({ 
       cakeStands: updated,
       selectedCakeStandId: state.selectedCakeStandId === standId ? null : state.selectedCakeStandId
+    });
+  };
+
+  // Tray (Bandeja) event handlers
+  const handleTrayPointerDown = (trayId: string, e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest(".resize-handle") || (e.target as HTMLElement).closest(".delete-btn")) return;
+    e.preventDefault();
+    onUpdateState({ 
+      selectedTrayId: trayId,
+      selectedCakeStandId: null, 
+      selectedBalloonId: null, 
+      selectedPanelId: null, 
+      selectedCylinderIndex: null,
+      selectedNeonNumberId: null,
+      selectedLadderShelfId: null,
+      isTextSelected: false
+    });
+
+    const trays = state.trays || [];
+    const tray = trays.find(t => t.id === trayId);
+    if (!tray) return;
+
+    setActiveTrayDrag({
+      trayId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startTrayX: tray.x,
+      startTrayY: tray.y
+    });
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleTrayPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const trays = state.trays || [];
+
+    if (activeTrayDrag) {
+      const { trayId, startX, startY, startTrayX, startTrayY } = activeTrayDrag;
+      const tray = trays.find(t => t.id === trayId);
+      if (!tray) return;
+
+      const dx = (e.clientX - startX) / zoom;
+      const dy = (e.clientY - startY) / zoom;
+
+      const nextX = Math.max(-200, Math.min(450, startTrayX + dx));
+      const nextY = Math.max(-100, Math.min(400, startTrayY - dy));
+
+      const updated = trays.map(t => t.id === trayId ? { ...t, x: nextX, y: nextY } : t);
+      onUpdateState({ trays: updated });
+    } else if (activeTrayResize) {
+      const { trayId, type, startX, startY, startW, startH } = activeTrayResize;
+      const tray = trays.find(t => t.id === trayId);
+      if (!tray) return;
+
+      const dx = (e.clientX - startX) / zoom;
+      const dy = (e.clientY - startY) / zoom;
+
+      let newW = tray.w;
+      let newH = tray.h;
+
+      if (type === "width") {
+        newW = Math.max(25, Math.min(250, startW + dx));
+      } else if (type === "height") {
+        newH = Math.max(15, Math.min(180, startH - dy));
+      } else if (type === "diagonal") {
+        const ratio = (startW + dx) / startW;
+        newW = Math.max(25, Math.min(250, startW + dx));
+        newH = Math.max(15, Math.min(180, startH * ratio));
+      }
+
+      const updated = trays.map(t => t.id === trayId ? { ...t, w: newW, h: newH } : t);
+      onUpdateState({ trays: updated });
+    }
+  };
+
+  const handleTrayPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeTrayDrag) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      setActiveTrayDrag(null);
+    }
+    if (activeTrayResize) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      setActiveTrayResize(null);
+    }
+  };
+
+  const handleTrayResizePointerDown = (trayId: string, type: "width" | "height" | "diagonal", e: React.PointerEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    e.preventDefault();
+    onUpdateState({ 
+      selectedTrayId: trayId, 
+      selectedCakeStandId: null, 
+      selectedBalloonId: null, 
+      selectedPanelId: null, 
+      selectedCylinderIndex: null,
+      selectedNeonNumberId: null,
+      selectedLadderShelfId: null,
+      isTextSelected: false
+    });
+
+    const trays = state.trays || [];
+    const tray = trays.find(t => t.id === trayId);
+    if (!tray) return;
+
+    setActiveTrayResize({
+      trayId,
+      type,
+      startX: e.clientX,
+      startY: e.clientY,
+      startW: tray.w,
+      startH: tray.h
+    });
+
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+
+  const handleDeleteTray = (trayId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const trays = state.trays || [];
+    const updated = trays.filter(t => t.id !== trayId);
+    onUpdateState({ 
+      trays: updated,
+      selectedTrayId: state.selectedTrayId === trayId ? null : state.selectedTrayId
     });
   };
 
@@ -644,7 +1438,8 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       selectedCakeStandId: null, 
       selectedBalloonId: null, 
       selectedPanelId: null, 
-      selectedCylinderIndex: null 
+      selectedCylinderIndex: null,
+      selectedNeonNumberId: null
     });
 
     setActiveTextDrag({
@@ -740,6 +1535,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       selectedPanelId: null, 
       selectedCylinderIndex: null,
       selectedCakeStandId: null,
+      selectedNeonNumberId: null,
       isTextSelected: false
     });
 
@@ -819,7 +1615,12 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
   const handleBalloonResizePointerDown = (balloonId: string, type: "width" | "height" | "diagonal" | "rotate", e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
-    onUpdateState({ selectedBalloonId: balloonId, selectedPanelId: null, selectedCylinderIndex: null });
+    onUpdateState({ 
+      selectedBalloonId: balloonId, 
+      selectedPanelId: null, 
+      selectedCylinderIndex: null,
+      selectedNeonNumberId: null
+    });
 
     const balloonsList = getActiveBalloons(state);
     const balloon = balloonsList.find(b => b.id === balloonId);
@@ -1011,6 +1812,42 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
               </div>
             </div>
 
+            {/* Layering (zIndex) Controls */}
+            <div 
+              className="absolute -bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-950/95 border border-slate-800 px-2 py-1 rounded-xl shadow-2xl z-[100] pointer-events-auto whitespace-nowrap animate-fadeIn"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = getActiveBalloons(state);
+                  const updated = list.map(b => b.id === balloon.id ? { ...b, zIndex: Math.max(1, (b.zIndex ?? 30) - 5) } : b);
+                  onUpdateState({ balloons: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Recuar (Mandar para Trás)"
+              >
+                <ArrowDown className="w-3 h-3 text-indigo-400" />
+                <span>Recuar</span>
+              </button>
+              <span className="text-[9px] font-mono text-slate-500 px-1 font-bold select-none">
+                C:{balloon.zIndex ?? 30}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = getActiveBalloons(state);
+                  const updated = list.map(b => b.id === balloon.id ? { ...b, zIndex: Math.min(100, (b.zIndex ?? 30) + 5) } : b);
+                  onUpdateState({ balloons: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Trazer para Frente"
+              >
+                <ArrowUp className="w-3 h-3 text-emerald-400" />
+                <span>Avançar</span>
+              </button>
+            </div>
+
             {/* Delete button (top-left) */}
             <button
               className="delete-btn absolute top-[-10px] left-[-10px] w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg border border-rose-400 z-50 cursor-pointer pointer-events-auto transition-transform active:scale-95"
@@ -1078,6 +1915,42 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
               ⤡
             </div>
 
+            {/* Layering (zIndex) Controls */}
+            <div 
+              className="absolute -bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-950/95 border border-slate-800 px-2 py-1 rounded-xl shadow-2xl z-[100] pointer-events-auto whitespace-nowrap animate-fadeIn"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = state.cakeStands || [];
+                  const updated = list.map(s => s.id === stand.id ? { ...s, zIndex: Math.max(1, (s.zIndex ?? 50) - 5) } : s);
+                  onUpdateState({ cakeStands: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Recuar (Mandar para Trás)"
+              >
+                <ArrowDown className="w-3 h-3 text-indigo-400" />
+                <span>Recuar</span>
+              </button>
+              <span className="text-[9px] font-mono text-slate-500 px-1 font-bold select-none">
+                C:{stand.zIndex ?? 50}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = state.cakeStands || [];
+                  const updated = list.map(s => s.id === stand.id ? { ...s, zIndex: Math.min(100, (s.zIndex ?? 50) + 5) } : s);
+                  onUpdateState({ cakeStands: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Trazer para Frente"
+              >
+                <ArrowUp className="w-3 h-3 text-emerald-400" />
+                <span>Avançar</span>
+              </button>
+            </div>
+
             {/* Delete button (top-left) */}
             <button
               className="delete-btn absolute top-[-10px] left-[-10px] w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg border border-rose-400 z-50 cursor-pointer pointer-events-auto transition-transform active:scale-95"
@@ -1095,6 +1968,559 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
   const renderCakeStands = () => {
     const list = state.cakeStands || [];
     return list.map((stand) => renderCakeStandItem(stand));
+  };
+
+  const renderNeonNumberSVG = (num: number, color: string) => {
+    const neonColor = color || "#FFFBEB"; // default warm white glow
+    const glowId = `neon-glow-${num}-${Math.random().toString(36).substr(2, 4)}`;
+    
+    return (
+      <svg 
+        viewBox="0 0 100 140" 
+        width="100%" 
+        height="100%" 
+        className="overflow-visible"
+      >
+        <defs>
+          {/* Neon Glow Filter */}
+          <filter id={glowId} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <filter id={`${glowId}-bg`} x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur stdDeviation="5" result="blur"/>
+            <feComponentTransfer in="blur" result="boost">
+              <feFuncA type="linear" slope="0.8"/>
+            </feComponentTransfer>
+            <feMerge>
+              <feMergeNode in="boost"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Behind-glow of the neon tube (softer wide diffuse light) */}
+        <text
+          x="50"
+          y="95"
+          textAnchor="middle"
+          fontFamily="'Space Grotesk', 'Inter', sans-serif"
+          fontWeight="bold"
+          fontSize="82"
+          fill="none"
+          stroke={neonColor}
+          strokeWidth="10"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity="0.3"
+          style={{ filter: `url(#${glowId}-bg)` }}
+        >
+          {num}
+        </text>
+
+        {/* Main outer glow of neon tube */}
+        <text
+          x="50"
+          y="95"
+          textAnchor="middle"
+          fontFamily="'Space Grotesk', 'Inter', sans-serif"
+          fontWeight="bold"
+          fontSize="82"
+          fill="none"
+          stroke={neonColor}
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ filter: `url(#${glowId})` }}
+        >
+          {num}
+        </text>
+
+        {/* Inner hot core of neon tube (creates realistic bright center) */}
+        <text
+          x="50"
+          y="95"
+          textAnchor="middle"
+          fontFamily="'Space Grotesk', 'Inter', sans-serif"
+          fontWeight="bold"
+          fontSize="82"
+          fill="none"
+          stroke="#FFFFFF"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {num}
+        </text>
+      </svg>
+    );
+  };
+
+  const renderNeonNumberItem = (item: any) => {
+    const isSelected = state.selectedNeonNumberId === item.id;
+
+    return (
+      <div
+        key={item.id}
+        className={`absolute select-none interactive-item ${activeNeonNumberDrag?.numId === item.id ? "cursor-grabbing" : "cursor-grab"} pointer-events-auto`}
+        style={{
+          left: `${item.x}px`,
+          bottom: `${item.y}px`,
+          width: `${item.w}px`,
+          height: `${item.h}px`,
+          touchAction: "none",
+          zIndex: item.zIndex ?? 60
+        }}
+        onPointerDown={(e) => handleNeonNumberPointerDown(item.id, e)}
+        onPointerMove={handleNeonNumberPointerMove}
+        onPointerUp={handleNeonNumberPointerUp}
+      >
+        {renderNeonNumberSVG(item.number, item.color)}
+
+        {/* Selected outline & Interactive Handles */}
+        {isSelected && (
+          <>
+            {/* Dotted border highlight */}
+            <div className="absolute -inset-2 border-2 border-dashed border-emerald-400 rounded-xl animate-[pulse_1.5s_infinite] pointer-events-none z-50" />
+            
+            {/* Left/Right Width Resize Handle */}
+            <div
+              className="resize-handle absolute right-[-8px] top-1/2 -translate-y-1/2 w-4 h-4 bg-emerald-500 hover:bg-emerald-400 rounded-full border-2 border-white shadow cursor-ew-resize z-50"
+              onPointerDown={(e) => handleNeonNumberResizePointerDown(item.id, "width", e)}
+            />
+
+            {/* Top Height Resize Handle */}
+            <div
+              className="resize-handle absolute top-[-8px] left-1/2 -translate-x-1/2 w-4 h-4 bg-emerald-500 hover:bg-emerald-400 rounded-full border-2 border-white shadow cursor-ns-resize z-50"
+              onPointerDown={(e) => handleNeonNumberResizePointerDown(item.id, "height", e)}
+            />
+
+            {/* Diagonal Proportional Resize Handle */}
+            <div
+              className="resize-handle absolute top-[-8px] right-[-8px] w-4.5 h-4.5 bg-emerald-500 hover:bg-emerald-400 rounded-full border-2 border-white shadow cursor-nwse-resize z-50 flex items-center justify-center text-[8px] text-white font-bold"
+              onPointerDown={(e) => handleNeonNumberResizePointerDown(item.id, "diagonal", e)}
+            >
+              ⤡
+            </div>
+
+            {/* Layering (zIndex) Controls */}
+            <div 
+              className="absolute -bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-950/95 border border-slate-800 px-2 py-1 rounded-xl shadow-2xl z-[100] pointer-events-auto whitespace-nowrap animate-fadeIn"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = state.neonNumbers || [];
+                  const updated = list.map(n => n.id === item.id ? { ...n, zIndex: Math.max(1, (n.zIndex ?? 60) - 5) } : n);
+                  onUpdateState({ neonNumbers: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Recuar (Mandar para Trás)"
+              >
+                <ArrowDown className="w-3 h-3 text-indigo-400" />
+                <span>Recuar</span>
+              </button>
+              <span className="text-[9px] font-mono text-slate-500 px-1 font-bold select-none">
+                C:{item.zIndex ?? 60}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = state.neonNumbers || [];
+                  const updated = list.map(n => n.id === item.id ? { ...n, zIndex: Math.min(100, (n.zIndex ?? 60) + 5) } : n);
+                  onUpdateState({ neonNumbers: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Trazer para Frente"
+              >
+                <ArrowUp className="w-3 h-3 text-emerald-400" />
+                <span>Avançar</span>
+              </button>
+            </div>
+
+            {/* Delete button (top-left) */}
+            <button
+              className="delete-btn absolute top-[-10px] left-[-10px] w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg border border-rose-400 z-50 cursor-pointer pointer-events-auto transition-transform active:scale-95"
+              onClick={(e) => handleDeleteNeonNumber(item.id, e)}
+              title="Excluir Número"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderNeonNumbers = () => {
+    const list = state.neonNumbers || [];
+    return list.map((item) => renderNeonNumberItem(item));
+  };
+
+  const renderLadderShelfSVG = (color: string) => {
+    const baseColor = color || "#D8A062";
+    
+    return (
+      <svg 
+        viewBox="0 0 100 157" 
+        width="100%" 
+        height="100%" 
+        className="overflow-visible filter drop-shadow-[0_8px_12px_rgba(0,0,0,0.3)]"
+      >
+        {/* Back Legs (with dark shading) */}
+        {/* Back Left Leg */}
+        <polygon points="35,10 39,10 51,145 47,145" fill={baseColor} />
+        <polygon points="35,10 39,10 51,145 47,145" fill="#000000" opacity="0.25" />
+        
+        {/* Back Right Leg */}
+        <polygon points="61,10 65,10 73,145 69,145" fill={baseColor} />
+        <polygon points="61,10 65,10 73,145 69,145" fill="#000000" opacity="0.25" />
+
+        {/* Front Legs */}
+        {/* Front Left Leg */}
+        <polygon points="33,10 37,10 15,145 11,145" fill={baseColor} />
+        <polygon points="33,10 37,10 15,145 11,145" fill="#FFFFFF" opacity="0.08" />
+        
+        {/* Front Right Leg */}
+        <polygon points="63,10 67,10 89,145 85,145" fill={baseColor} />
+        <polygon points="63,10 67,10 89,145 85,145" fill="#000000" opacity="0.05" />
+
+        {/* Top support bar */}
+        <polygon points="33,10 67,10 67,14 33,14" fill={baseColor} />
+        <polygon points="33,10 67,10 67,14 33,14" fill="#000000" opacity="0.1" />
+
+        {/* 1. TOP SHELF */}
+        <polygon points="27,39 73,39 73,44 27,44" fill="#000000" opacity="0.15" filter="blur(1px)" />
+        <polygon points="31,30 69,30 71,35 29,35" fill={baseColor} />
+        <polygon points="31,30 69,30 71,35 29,35" fill="#FFFFFF" opacity="0.05" />
+        <polygon points="29,35 71,35 71,39 29,39" fill={baseColor} />
+        <polygon points="29,35 71,35 71,39 29,39" fill="#000000" opacity="0.15" />
+        <polygon points="29,35 29,39 31,39 31,30" fill={baseColor} />
+        <polygon points="29,35 29,39 31,39 31,30" fill="#000000" opacity="0.25" />
+
+        {/* 2. MIDDLE SHELF */}
+        <polygon points="14,78 86,78 86,84 14,84" fill="#000000" opacity="0.18" filter="blur(1.5px)" />
+        <polygon points="20,70 80,70 84,78 16,78" fill={baseColor} />
+        <polygon points="20,70 80,70 84,78 16,78" fill="#FFFFFF" opacity="0.05" />
+        <polygon points="16,78 84,78 84,83 16,83" fill={baseColor} />
+        <polygon points="16,78 84,78 84,83 16,83" fill="#000000" opacity="0.15" />
+        <polygon points="16,78 16,83 20,83 20,70" fill={baseColor} />
+        <polygon points="16,78 16,83 20,83 20,70" fill="#000000" opacity="0.25" />
+
+        {/* 3. BOTTOM SHELF */}
+        <polygon points="1,125 99,125 99,132 1,132" fill="#000000" opacity="0.22" filter="blur(2px)" />
+        <polygon points="8,115 92,115 97,125 3,125" fill={baseColor} />
+        <polygon points="8,115 92,115 97,125 3,125" fill="#FFFFFF" opacity="0.05" />
+        <polygon points="3,125 97,125 97,131 3,131" fill={baseColor} />
+        <polygon points="3,125 97,125 97,131 3,131" fill="#000000" opacity="0.15" />
+        <polygon points="3,125 3,131 8,131 8,115" fill={baseColor} />
+        <polygon points="3,125 3,131 8,131 8,115" fill="#000000" opacity="0.25" />
+      </svg>
+    );
+  };
+
+  const renderLadderShelfItem = (item: any) => {
+    const isSelected = state.selectedLadderShelfId === item.id;
+
+    return (
+      <div
+        key={item.id}
+        className={`absolute select-none interactive-item ${activeLadderShelfDrag?.ladderId === item.id ? "cursor-grabbing" : "cursor-grab"} pointer-events-auto`}
+        style={{
+          left: `${item.x}px`,
+          bottom: `${item.y}px`,
+          width: `${item.w}px`,
+          height: `${item.h}px`,
+          touchAction: "none",
+          zIndex: item.zIndex ?? 50
+        }}
+        onPointerDown={(e) => handleLadderShelfPointerDown(item.id, e)}
+        onPointerMove={handleLadderShelfPointerMove}
+        onPointerUp={handleLadderShelfPointerUp}
+      >
+        {renderLadderShelfSVG(item.color)}
+
+        {/* Selected outline & Interactive Handles */}
+        {isSelected && (
+          <>
+            {/* Dotted border highlight */}
+            <div className="absolute -inset-2 border-2 border-dashed border-teal-400 rounded-xl animate-[pulse_1.5s_infinite] pointer-events-none z-50" />
+            
+            {/* Left/Right Width Resize Handle */}
+            <div
+              className="resize-handle absolute right-[-8px] top-1/2 -translate-y-1/2 w-4 h-4 bg-teal-500 hover:bg-teal-400 rounded-full border-2 border-white shadow cursor-ew-resize z-50"
+              onPointerDown={(e) => handleLadderShelfResizePointerDown(item.id, "width", e)}
+            />
+
+            {/* Top Height Resize Handle */}
+            <div
+              className="resize-handle absolute top-[-8px] left-1/2 -translate-x-1/2 w-4 h-4 bg-teal-500 hover:bg-teal-400 rounded-full border-2 border-white shadow cursor-ns-resize z-50"
+              onPointerDown={(e) => handleLadderShelfResizePointerDown(item.id, "height", e)}
+            />
+
+            {/* Diagonal Proportional Resize Handle */}
+            <div
+              className="resize-handle absolute top-[-8px] right-[-8px] w-4.5 h-4.5 bg-teal-500 hover:bg-teal-400 rounded-full border-2 border-white shadow cursor-nwse-resize z-50 flex items-center justify-center text-[8px] text-white font-bold"
+              onPointerDown={(e) => handleLadderShelfResizePointerDown(item.id, "diagonal", e)}
+            >
+              ⤡
+            </div>
+
+            {/* Layering (zIndex) Controls */}
+            <div 
+              className="absolute -bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-950/95 border border-slate-800 px-2 py-1 rounded-xl shadow-2xl z-[100] pointer-events-auto whitespace-nowrap animate-fadeIn"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = state.ladderShelves || [];
+                  const updated = list.map(l => l.id === item.id ? { ...l, zIndex: Math.max(1, (l.zIndex ?? 50) - 5) } : l);
+                  onUpdateState({ ladderShelves: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Recuar (Mandar para Trás)"
+              >
+                <ArrowDown className="w-3 h-3 text-indigo-400" />
+                <span>Recuar</span>
+              </button>
+              <span className="text-[9px] font-mono text-slate-500 px-1 font-bold select-none">
+                C:{item.zIndex ?? 50}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = state.ladderShelves || [];
+                  const updated = list.map(l => l.id === item.id ? { ...l, zIndex: Math.min(100, (l.zIndex ?? 50) + 5) } : l);
+                  onUpdateState({ ladderShelves: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Trazer para Frente"
+              >
+                <ArrowUp className="w-3 h-3 text-emerald-400" />
+                <span>Avançar</span>
+              </button>
+            </div>
+
+            {/* Delete button (top-left) */}
+            <button
+              className="delete-btn absolute top-[-10px] left-[-10px] w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg border border-rose-400 z-50 cursor-pointer pointer-events-auto transition-transform active:scale-95"
+              onClick={(e) => handleDeleteLadderShelf(item.id, e)}
+              title="Excluir Estante"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderLadderShelves = () => {
+    const list = state.ladderShelves || [];
+    return list.map((item) => renderLadderShelfItem(item));
+  };
+
+  const renderTraySVG = (shape: 'rectangular_legs' | 'oval_beaded' | 'hexagonal', color: string) => {
+    if (shape === 'rectangular_legs') {
+      return (
+        <svg viewBox="0 0 100 73" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Soft Drop Shadow under the tray legs */}
+          <ellipse cx="50" cy="58" rx="42" ry="8" fill="#000000" opacity="0.25" filter="blur(3px)" />
+
+          {/* Back Left Leg */}
+          <path d="M12,28 C10,34 6,40 6,48 C6,51 8,52 10,50 C12,48 14,44 14,34 Z" fill={color} />
+          <path d="M12,28 C10,34 6,40 6,48 C6,51 8,52 10,50 C12,48 14,44 14,34 Z" fill="#000000" opacity="0.2" />
+
+          {/* Back Right Leg */}
+          <path d="M88,28 C90,34 94,40 94,48 C94,51 92,52 90,50 C88,48 86,44 86,34 Z" fill={color} />
+          <path d="M88,28 C90,34 94,40 94,48 C94,51 92,52 90,50 C88,48 86,44 86,34 Z" fill="#000000" opacity="0.2" />
+
+          {/* Front Left Leg */}
+          <path d="M8,34 C6,44 2,50 2,60 C2,64 6,65 9,62 C12,59 15,53 15,38 Z" fill={color} />
+          <path d="M8,34 C6,44 2,50 2,60 C2,64 6,65 9,62 C12,59 15,53 15,38 Z" fill="#000000" opacity="0.1" />
+
+          {/* Front Right Leg */}
+          <path d="M92,34 C94,44 98,50 98,60 C98,64 94,65 91,62 C88,59 85,53 85,38 Z" fill={color} />
+          <path d="M92,34 C94,44 98,50 98,60 C98,64 94,65 91,62 C88,59 85,53 85,38 Z" fill="#000000" opacity="0.3" />
+
+          {/* Front Apron */}
+          <path d="M8,32 L92,32 L92,38 L8,38 Z" fill={color} />
+          <path d="M8,32 L92,32 L92,38 L8,38 Z" fill="#000000" opacity="0.15" />
+
+          {/* Top surface of the tray */}
+          <path d="M14,14 L86,14 L92,32 L8,32 Z" fill={color} />
+          <path d="M14,14 L86,14 L92,32 L8,32 Z" fill="#FFFFFF" opacity="0.1" />
+
+          {/* Highlights & Shadows */}
+          <path d="M8,32 L92,32" stroke="#FFFFFF" strokeWidth="1" opacity="0.3" />
+          <path d="M8,38 L92,38" stroke="#000000" strokeWidth="1.5" opacity="0.2" />
+        </svg>
+      );
+    } else if (shape === 'oval_beaded') {
+      return (
+        <svg viewBox="0 0 100 73" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Shadow under the tray */}
+          <ellipse cx="50" cy="40" rx="42" ry="16" fill="#000000" opacity="0.3" filter="blur(3.5px)" />
+
+          {/* Beaded outer rim */}
+          <ellipse cx="50" cy="38" rx="41" ry="18" fill={color} />
+          <ellipse cx="50" cy="38" rx="41" ry="18" stroke={color} strokeWidth="2.5" />
+          <ellipse cx="50" cy="39" rx="41" ry="18" stroke="#000000" strokeWidth="2" opacity="0.15" />
+
+          {/* Dasharray sphere beaded styling */}
+          <ellipse cx="50" cy="37.5" rx="42" ry="19.5" stroke={color} strokeWidth="4" strokeDasharray="0.1 6.5" strokeLinecap="round" />
+          <ellipse cx="50" cy="36.5" rx="42" ry="19.5" stroke="#FFFFFF" strokeWidth="3" strokeDasharray="0.1 6.5" strokeLinecap="round" opacity="0.25" />
+          <ellipse cx="50" cy="38.5" rx="42" ry="19.5" stroke="#000000" strokeWidth="3.5" strokeDasharray="0.1 6.5" strokeLinecap="round" opacity="0.2" />
+
+          {/* Flat inner surface */}
+          <ellipse cx="50" cy="38" rx="38" ry="15" fill={color} />
+          <ellipse cx="50" cy="38" rx="38" ry="15" fill="#000000" opacity="0.1" />
+          <ellipse cx="50" cy="37" rx="37" ry="14" fill={color} />
+
+          {/* Glossy overlay */}
+          <ellipse cx="50" cy="37" rx="36" ry="13" fill="#FFFFFF" opacity="0.05" />
+          <ellipse cx="44" cy="33" rx="18" ry="6" fill="#FFFFFF" opacity="0.15" filter="blur(1px)" />
+        </svg>
+      );
+    } else {
+      // Hexagonal
+      return (
+        <svg viewBox="0 0 100 73" width="100%" height="100%" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Shadow */}
+          <polygon points="50,66 90,53 90,32 50,19 10,32 10,53" fill="#000000" opacity="0.28" filter="blur(4px)" />
+
+          {/* 3D Sides */}
+          <polygon points="14,43 50,54 50,62 14,51" fill={color} />
+          <polygon points="14,43 50,54 50,62 14,51" fill="#000000" opacity="0.2" />
+
+          <polygon points="50,54 86,43 86,51 50,62" fill={color} />
+          <polygon points="50,54 86,43 86,51 50,62" fill="#000000" opacity="0.35" />
+
+          {/* Rim */}
+          <polygon points="50,10 86,21 86,43 50,54 14,43 14,21" fill={color} />
+          <polygon points="50,10 86,21 86,43 50,54 14,43 14,21" fill="#FFFFFF" opacity="0.08" />
+
+          {/* Cavity */}
+          <polygon points="50,14 82,23 82,41 50,50 18,41 18,23" fill={color} />
+          <polygon points="50,14 82,23 82,41 50,50 18,41 18,23" fill="#000000" opacity="0.15" />
+
+          {/* Deep Base */}
+          <polygon points="50,15 80,24 80,40 50,49 20,40 20,24" fill={color} />
+
+          {/* Line Highlights */}
+          <polyline points="14,21 50,10 86,21" stroke="#FFFFFF" strokeWidth="1" opacity="0.3" />
+          <polyline points="14,43 50,54 86,43" stroke="#FFFFFF" strokeWidth="1" opacity="0.2" />
+          <polyline points="18,23 50,14 82,23" stroke="#000000" strokeWidth="1.2" opacity="0.25" />
+        </svg>
+      );
+    }
+  };
+
+  const renderTrayItem = (item: any) => {
+    const isSelected = state.selectedTrayId === item.id;
+
+    return (
+      <div
+        key={item.id}
+        className={`absolute select-none interactive-item ${activeTrayDrag?.trayId === item.id ? "cursor-grabbing" : "cursor-grab"} pointer-events-auto`}
+        style={{
+          left: `${item.x}px`,
+          bottom: `${item.y}px`,
+          width: `${item.w}px`,
+          height: `${item.h}px`,
+          touchAction: "none",
+          zIndex: item.zIndex ?? 50
+        }}
+        onPointerDown={(e) => handleTrayPointerDown(item.id, e)}
+        onPointerMove={handleTrayPointerMove}
+        onPointerUp={handleTrayPointerUp}
+      >
+        {renderTraySVG(item.shape, item.color)}
+
+        {/* Selected outline & Interactive Handles */}
+        {isSelected && (
+          <>
+            {/* Dotted border highlight */}
+            <div className="absolute -inset-2 border-2 border-dashed border-teal-400 rounded-xl animate-[pulse_1.5s_infinite] pointer-events-none z-50" />
+            
+            {/* Left/Right Width Resize Handle */}
+            <div
+              className="resize-handle absolute right-[-8px] top-1/2 -translate-y-1/2 w-4 h-4 bg-teal-500 hover:bg-teal-400 rounded-full border-2 border-white shadow cursor-ew-resize z-50"
+              onPointerDown={(e) => handleTrayResizePointerDown(item.id, "width", e)}
+            />
+
+            {/* Top Height Resize Handle */}
+            <div
+              className="resize-handle absolute top-[-8px] left-1/2 -translate-x-1/2 w-4 h-4 bg-teal-500 hover:bg-teal-400 rounded-full border-2 border-white shadow cursor-ns-resize z-50"
+              onPointerDown={(e) => handleTrayResizePointerDown(item.id, "height", e)}
+            />
+
+            {/* Diagonal Proportional Resize Handle */}
+            <div
+              className="resize-handle absolute top-[-8px] right-[-8px] w-4.5 h-4.5 bg-teal-500 hover:bg-teal-400 rounded-full border-2 border-white shadow cursor-nwse-resize z-50 flex items-center justify-center text-[8px] text-white font-bold"
+              onPointerDown={(e) => handleTrayResizePointerDown(item.id, "diagonal", e)}
+            >
+              ⤡
+            </div>
+
+            {/* Layering (zIndex) Controls */}
+            <div 
+              className="absolute -bottom-14 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-950/95 border border-slate-800 px-2 py-1 rounded-xl shadow-2xl z-[100] pointer-events-auto whitespace-nowrap animate-fadeIn"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = state.trays || [];
+                  const updated = list.map(t => t.id === item.id ? { ...t, zIndex: Math.max(1, (t.zIndex ?? 50) - 5) } : t);
+                  onUpdateState({ trays: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Recuar (Mandar para Trás)"
+              >
+                <ArrowDown className="w-3 h-3 text-indigo-400" />
+                <span>Recuar</span>
+              </button>
+              <span className="text-[9px] font-mono text-slate-500 px-1 font-bold select-none">
+                C:{item.zIndex ?? 50}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const list = state.trays || [];
+                  const updated = list.map(t => t.id === item.id ? { ...t, zIndex: Math.min(100, (t.zIndex ?? 50) + 5) } : t);
+                  onUpdateState({ trays: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Trazer para Frente"
+              >
+                <ArrowUp className="w-3 h-3 text-emerald-400" />
+                <span>Avançar</span>
+              </button>
+            </div>
+
+            {/* Delete button (top-left) */}
+            <button
+              className="delete-btn absolute top-[-10px] left-[-10px] w-5 h-5 bg-rose-600 hover:bg-rose-500 text-white rounded-full flex items-center justify-center shadow-lg border border-rose-400 z-50 cursor-pointer pointer-events-auto transition-transform active:scale-95"
+              onClick={(e) => handleDeleteTray(item.id, e)}
+              title="Excluir Bandeja"
+            >
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  const renderTrays = () => {
+    const list = state.trays || [];
+    return list.map((item) => renderTrayItem(item));
   };
 
   const renderDraggableTextOverlay = () => {
@@ -1203,7 +2629,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       };
     }
     if (state.floorType === "image") {
-      const imgUrl = state.floorImageUrl || "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=500&q=80";
+      const imgUrl = getProxiedUrl(state.floorImageUrl || "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=500&q=80");
       return {
         backgroundImage: `url('${imgUrl}')`,
         backgroundSize: "cover",
@@ -1302,7 +2728,13 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
   // Drag and drop event handlers
   const handlePointerDown = (index: number, e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault();
-    onUpdateState({ selectedCylinderIndex: index, selectedPanelId: null, selectedBalloonId: null });
+    onUpdateState({ 
+      selectedCylinderIndex: index, 
+      selectedPanelId: null, 
+      selectedBalloonId: null,
+      selectedNeonNumberId: null,
+      selectedCakeStandId: null
+    });
     const current = index === 0 ? cyl0Pos : index === 1 ? cyl1Pos : cyl2Pos;
     
     setActiveDrag({
@@ -1352,7 +2784,13 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
   const handleResizePointerDown = (index: number, type: "width" | "height" | "diagonal", e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
-    onUpdateState({ selectedCylinderIndex: index, selectedPanelId: null, selectedBalloonId: null });
+    onUpdateState({ 
+      selectedCylinderIndex: index, 
+      selectedPanelId: null, 
+      selectedBalloonId: null,
+      selectedNeonNumberId: null,
+      selectedCakeStandId: null
+    });
     const current = index === 0 ? cyl0Pos : index === 1 ? cyl1Pos : cyl2Pos;
 
     setActiveResize({
@@ -1420,6 +2858,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       selectedBalloonId: null, 
       selectedCylinderIndex: null,
       selectedCakeStandId: null,
+      selectedNeonNumberId: null,
       isTextSelected: false
     });
     
@@ -1495,7 +2934,12 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
   const handlePanelResizePointerDown = (panelId: string, type: "width" | "height" | "diagonal", e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
     e.preventDefault();
-    onUpdateState({ selectedPanelId: panelId, selectedBalloonId: null, selectedCylinderIndex: null });
+    onUpdateState({ 
+      selectedPanelId: panelId, 
+      selectedBalloonId: null, 
+      selectedCylinderIndex: null,
+      selectedNeonNumberId: null
+    });
     
     const panelsList = getActivePanels(state);
     const panel = panelsList.find(p => p.id === panelId);
@@ -2606,11 +4050,12 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
             >
               {cyl.hasImage && (
                 <img
-                  src={cyl.imageUrl}
+                  src={getProxiedUrl(cyl.imageUrl)}
                   alt="Cylinder Top Design"
                   className={`absolute inset-0 w-full h-full pointer-events-none ${state.imageFit === 'contain' ? 'object-contain' : state.imageFit === 'fill' ? 'object-fill' : 'object-cover'}`}
                   style={{ filter: "brightness(0.95)", borderRadius: "50%" }}
                   referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
                 />
               )}
               {currentStyle === "matching" && !cyl.hasImage && (
@@ -2620,6 +4065,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
                   className={`absolute inset-0 w-full h-full opacity-70 pointer-events-none ${state.imageFit === 'contain' ? 'object-contain' : state.imageFit === 'fill' ? 'object-fill' : 'object-cover'}`}
                   style={{ filter: "brightness(0.95)", borderRadius: "50%" }}
                   referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
                 />
               )}
               {/* Lighting overlay for realistic 3D appearance */}
@@ -2661,11 +4107,12 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
 
                 {cyl.hasImage && (
                   <img
-                    src={cyl.imageUrl}
+                    src={getProxiedUrl(cyl.imageUrl)}
                     alt="Design"
                     className={`absolute inset-0 w-full h-full pointer-events-none ${state.imageFit === 'contain' ? 'object-contain' : state.imageFit === 'fill' ? 'object-fill' : 'object-cover'}`}
                     style={{ filter: "brightness(0.92)", borderRadius: "inherit" }}
                     referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
                   />
                 )}
 
@@ -2676,6 +4123,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
                     className={`absolute inset-0 w-full h-full opacity-35 mix-blend-overlay pointer-events-none ${state.imageFit === 'contain' ? 'object-contain' : state.imageFit === 'fill' ? 'object-fill' : 'object-cover'}`}
                     style={{ borderRadius: "inherit" }}
                     referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
                   />
                 )}
 
@@ -2802,7 +4250,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
   const renderPanel = (panel: PanelItem) => {
     const isSelected = state.selectedPanelId === panel.id;
     const shape = panel.shape;
-    const imgUrl = getPanelImage(panel, state, activeTheme);
+    const imgUrl = getProxiedUrl(getPanelImage(panel, state, activeTheme));
     const fitClass = panel.imageFit || state.imageFit || 'cover';
     const objectFitClass = fitClass === 'contain' ? 'object-contain' : fitClass === 'fill' ? 'object-fill' : 'object-cover';
 
@@ -2888,6 +4336,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
                 alt="Main Panel Backdrop"
                 className={`w-full h-full pointer-events-none select-none ${objectFitClass}`}
                 referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
               />
             </motion.div>
 
@@ -2911,6 +4360,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
               alt="Backdrop"
               className={`w-full h-full pointer-events-none select-none ${objectFitClass}`}
               referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
             />
             {state.gridVisible && (
               <div className="absolute inset-0 border border-emerald-500/50 flex items-center justify-center rounded-[inherit] pointer-events-none bg-emerald-500/5">
@@ -2934,6 +4384,42 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
         {/* Interactive Resize Handles (only visible when selected) */}
         {isSelected && (
           <>
+            {/* Layering (zIndex) Controls */}
+            <div 
+              className="absolute -top-14 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-950/95 border border-slate-800 px-2 py-1 rounded-xl shadow-2xl z-[100] pointer-events-auto whitespace-nowrap animate-fadeIn"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const panelsList = getActivePanels(state);
+                  const updated = panelsList.map(p => p.id === panel.id ? { ...p, zIndex: Math.max(1, (p.zIndex ?? 15) - 5) } : p);
+                  onUpdateState({ panels: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Recuar (Mandar para Trás)"
+              >
+                <ArrowDown className="w-3 h-3 text-indigo-400" />
+                <span>Recuar</span>
+              </button>
+              <span className="text-[9px] font-mono text-slate-500 px-1 font-bold select-none">
+                C:{panel.zIndex ?? 15}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const panelsList = getActivePanels(state);
+                  const updated = panelsList.map(p => p.id === panel.id ? { ...p, zIndex: Math.min(100, (p.zIndex ?? 15) + 5) } : p);
+                  onUpdateState({ panels: updated });
+                }}
+                className="p-1 px-1.5 text-[9.5px] font-bold text-slate-300 hover:text-white bg-slate-900 hover:bg-slate-850 rounded-md flex items-center gap-1 cursor-pointer transition-all active:scale-90 border border-slate-800"
+                title="Trazer para Frente"
+              >
+                <ArrowUp className="w-3 h-3 text-emerald-400" />
+                <span>Avançar</span>
+              </button>
+            </div>
+
             {/* Top Height Resize Handle */}
             <div
               className="resize-handle absolute left-1/2 -top-2.5 -translate-x-1/2 w-5 h-5 bg-emerald-500 rounded-full border-2 border-white shadow-md flex items-center justify-center cursor-ns-resize z-50 hover:scale-125 transition-transform"
@@ -2997,6 +4483,22 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
             </button>
           )}
           <button
+            onClick={() => handleExportImage(true)}
+            className="flex items-center gap-1.5 px-3 py-1 sm:px-3.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 transition-all cursor-pointer active:scale-95 shadow-md shadow-emerald-500/15"
+            title="Baixar imagem da maquete diretamente em formato JPG"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Baixar Imagem (JPG)</span>
+          </button>
+          <button
+            onClick={() => handleExportImage(false)}
+            className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-750 transition-all cursor-pointer active:scale-95"
+            title="Exportar maquete como imagem e compartilhar"
+          >
+            <Share2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Enviar p/ Cliente (Zap)</span>
+          </button>
+          <button
             onClick={() => onUpdateState({ gridVisible: !state.gridVisible })}
             className={`flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium border transition-colors ${
               state.gridVisible 
@@ -3006,6 +4508,18 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
           >
             <Grid className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>Medidas</span>
+          </button>
+          <button
+            onClick={() => onUpdateState({ guideLineVisible: state.guideLineVisible === false ? true : false })}
+            className={`flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium border transition-colors ${
+              state.guideLineVisible !== false 
+                ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400" 
+                : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300"
+            }`}
+            title="Mostrar ou ocultar a Linha Guia de Centro para alinhamento"
+          >
+            <SeparatorVertical className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+            <span>Linha Centro</span>
           </button>
           <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium hidden md:flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md select-none">
             🖱️ Scroll para Zoom
@@ -3029,6 +4543,9 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
               selectedBalloonId: null, 
               selectedCylinderIndex: null,
               selectedCakeStandId: null,
+              selectedNeonNumberId: null,
+              selectedLadderShelfId: null,
+              selectedTrayId: null,
               isTextSelected: false
             });
           }
@@ -3067,6 +4584,18 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
           {/* Main Decor Setup Group (Panel + Balloons + Cylinders) */}
           <div className="relative w-[340px] h-[280px] flex items-end justify-center z-20">
             
+            {/* Guide line marking the center of the image */}
+            {state.guideLineVisible !== false && (
+              <div 
+                data-html2canvas-ignore="true"
+                className="absolute top-[-40px] bottom-0 left-1/2 -translate-x-1/2 w-0.5 border-l-2 border-dashed border-rose-500/40 pointer-events-none z-[49] flex flex-col items-center justify-start"
+              >
+                <span className="text-[7px] sm:text-[8px] font-bold text-rose-400 bg-slate-950/90 px-1 py-0.5 rounded border border-rose-500/30 select-none pointer-events-none tracking-widest uppercase mt-1 shadow-md">
+                  Centro
+                </span>
+              </div>
+            )}
+            
             {/* BALLOON ARCH (Absolute wrap) */}
             {renderBalloons()}
 
@@ -3083,6 +4612,15 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
             {/* FREE-MOVING MULTIPLE CAKE STANDS */}
             {renderCakeStands()}
 
+            {/* FREE-MOVING NEON NUMBERS */}
+            {renderNeonNumbers()}
+
+            {/* FREE-MOVING LADDER SHELVES */}
+            {renderLadderShelves()}
+
+            {/* FREE-MOVING DECORATIVE TRAYS */}
+            {renderTrays()}
+
             {/* DRAGGABLE TEXT OVERLAY */}
             {renderDraggableTextOverlay()}
 
@@ -3090,14 +4628,26 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
 
           {/* PERSPECTIVE STAGE FLOOR (Simulated wood or grass) */}
           <div 
-            className="absolute bottom-0 left-0 right-0 h-40 transition-all duration-500"
+            className="absolute bottom-0 left-0 right-0 h-40 transition-all duration-500 overflow-hidden"
             style={{
-              ...getFloorStyle(),
+              backgroundColor: state.floorType === "color" ? (state.floorColor || "#cbd5e1") : undefined,
+              backgroundImage: state.floorType !== "color" && state.floorType !== "image" ? getFloorStyle().backgroundImage : undefined,
+              boxShadow: "inset 0 10px 20px rgba(0,0,0,0.2)",
               transform: "perspective(300px) rotateX(45deg)",
               transformOrigin: "bottom center",
               zIndex: 10,
             }}
-          />
+          >
+            {state.floorType === "image" && (
+              <img
+                src={getProxiedUrl(state.floorImageUrl || "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=500&q=80")}
+                alt="Floor Image"
+                className="w-full h-full object-cover pointer-events-none"
+                crossOrigin="anonymous"
+                referrerPolicy="no-referrer"
+              />
+            )}
+          </div>
 
           {/* Back wall baseboards and depth lines */}
           <div className="absolute bottom-40 left-0 right-0 h-1 bg-slate-950 border-b border-slate-800 z-0" />
@@ -3106,7 +4656,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
         {/* Floating Controls Overlay (Camera, Pan, Zoom) */}
         
         {/* Instruction badge for touch-based panning */}
-        <div className="absolute top-4 left-4 z-30 flex flex-col gap-1.5 pointer-events-none">
+        <div className="absolute top-4 left-4 z-30 flex flex-col gap-1.5 pointer-events-none" data-html2canvas-ignore="true">
           <div className="bg-slate-950/85 border border-slate-800 px-2.5 py-1.5 rounded-lg backdrop-blur-md flex items-center gap-1.5 shadow-xl">
             <Hand className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             <span className="text-[10px] text-slate-300 font-semibold leading-none">
@@ -3115,85 +4665,112 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
           </div>
         </div>
 
-        {/* Panning Nudge Controls (Bottom Left) */}
-        <div className="absolute bottom-4 left-4 flex flex-col gap-1.5 bg-slate-950/85 border border-slate-800 p-2 rounded-xl shadow-2xl z-30 backdrop-blur-md">
-          <div className="grid grid-cols-3 gap-1 w-24 h-24">
-            <div />
-            <button
-              onClick={() => setPanY(prev => prev - 40)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all cursor-pointer active:scale-90"
-              title="Mover Maquete para Cima"
-            >
-              <ArrowUp className="w-4 h-4" />
-            </button>
-            <div />
-            
-            <button
-              onClick={() => setPanX(prev => prev - 40)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all cursor-pointer active:scale-90"
-              title="Mover Maquete para Esquerda"
-            >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-            <button
-              onClick={handleResetCamera}
-              className="w-7 h-7 flex items-center justify-center rounded-lg bg-emerald-950/90 border border-emerald-500/30 text-emerald-400 font-extrabold hover:bg-emerald-900 transition-all cursor-pointer active:scale-90 text-[8px] uppercase tracking-tighter"
-              title="Centralizar Câmera (Foco)"
-            >
-              Foco
-            </button>
-            <button
-              onClick={() => setPanX(prev => prev + 40)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all cursor-pointer active:scale-90"
-              title="Mover Maquete para Direita"
-            >
-              <ArrowRight className="w-4 h-4" />
-            </button>
-            
-            <div />
-            <button
-              onClick={() => setPanY(prev => prev + 40)}
-              className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 transition-all cursor-pointer active:scale-90"
-              title="Mover Maquete para Baixo"
-            >
-              <ArrowDown className="w-4 h-4" />
-            </button>
-            <div />
+
+      </div>
+
+      {/* MODAL DE EXPORTAÇÃO PARA WHATSAPP */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+          <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden max-w-lg w-full shadow-2xl flex flex-col p-6 space-y-4">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-2">
+                <Camera className="w-5 h-5 text-emerald-400" />
+                <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
+                  Enviar Maquete para Cliente
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowExportModal(false);
+                  setExportedImgUrl(null);
+                  setExportStatus(null);
+                }}
+                className="bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-100 p-1.5 rounded-xl transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Content state */}
+            {isExporting ? (
+              <div className="py-12 flex flex-col items-center justify-center gap-4 text-center">
+                <Loader2 className="w-10 h-10 text-emerald-400 animate-spin" />
+                <div>
+                  <h5 className="font-bold text-slate-200 text-xs sm:text-sm">Gerando Imagem HD...</h5>
+                  <p className="text-[10.5px] text-slate-400 mt-1 max-w-[280px]">
+                    Limpando as bordas, ajustando escala e renderizando todas as texturas em alta definição.
+                  </p>
+                </div>
+              </div>
+            ) : exportedImgUrl ? (
+              <div className="space-y-4">
+                {/* Generated image preview */}
+                <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner group">
+                  <img 
+                    src={exportedImgUrl} 
+                    alt="Maquete de Apresentação" 
+                    className="w-full h-full object-contain"
+                  />
+                  <div className="absolute top-2 right-2 bg-emerald-500/90 text-slate-950 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded shadow">
+                    Imagem Pronta HD
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="bg-slate-950/60 p-3.5 rounded-2xl border border-slate-850/80 text-center">
+                    <p className="text-[11px] sm:text-xs text-slate-300 font-semibold leading-relaxed">
+                      Selecione uma opção abaixo para baixar e enviar a imagem para o seu cliente pelo WhatsApp!
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Baixar localmente */}
+                    <a
+                      href={exportedImgUrl}
+                      download={`maquete-decoracao-festa-${new Date().toISOString().slice(0,10)}.jpg`}
+                      className="bg-slate-800 hover:bg-slate-750 text-slate-100 font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-700 active:scale-95"
+                    >
+                      <Download className="w-4 h-4 text-emerald-400" />
+                      <span>Baixar Imagem</span>
+                    </a>
+
+                    {/* Compartilhar direto ou whatsapp */}
+                    <button
+                      type="button"
+                      onClick={handleShareImage}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3 px-4 rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 shadow-md shadow-emerald-500/10 font-sans"
+                    >
+                      {typeof navigator !== "undefined" && navigator.share ? (
+                        <>
+                          <Share2 className="w-4 h-4 text-slate-950" />
+                          <span>Compartilhar (Zap/Insta)</span>
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4 text-slate-950" />
+                          <span>Enviar via WhatsApp</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="text-center pt-2">
+                    <p className="text-[10px] text-slate-500 max-w-[340px] mx-auto italic">
+                      Dica: Para um melhor resultado, baixe a imagem e anexe como "Documento" ou "Imagem" de alta definição ao enviar para o WhatsApp.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="py-8 text-center text-rose-400 text-xs font-bold">
+                {exportStatus || "Ocorreu um erro ao gerar a imagem. Por favor, tente novamente."}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Zoom Controls Overlay (Bottom Right) */}
-        <div className="absolute bottom-4 right-4 flex items-center gap-1.5 bg-slate-950/85 border border-slate-800 p-2 rounded-xl shadow-2xl z-30 backdrop-blur-md">
-          <button 
-            onClick={() => setZoom(prev => Math.max(prev - 0.1, 0.4))}
-            className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 hover:border-slate-700 transition-all cursor-pointer active:scale-95"
-            title="Afastar Maquete (Zoom Out)"
-          >
-            <ZoomOut className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-          </button>
-          <span 
-            className="text-[11px] sm:text-[10px] font-mono font-bold text-slate-300 w-12 text-center select-none"
-            title="Nível de Zoom"
-          >
-            {Math.round(zoom * 100)}%
-          </span>
-          <button 
-            onClick={() => setZoom(prev => Math.min(prev + 0.1, 3.0))}
-            className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800 hover:border-slate-700 transition-all cursor-pointer active:scale-95"
-            title="Aproximar Maquete (Zoom In)"
-          >
-            <ZoomIn className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-          </button>
-          <div className="w-[1px] h-5 bg-slate-800 mx-1" />
-          <button 
-            onClick={handleResetCamera}
-            className="px-3 h-10 sm:px-2.5 sm:h-8 flex items-center justify-center rounded-lg bg-slate-900 border border-slate-800 text-xs sm:text-[10px] text-slate-400 font-bold hover:text-white hover:bg-slate-800 hover:border-slate-700 transition-all cursor-pointer active:scale-95"
-            title="Redefinir visualização e câmera"
-          >
-            Reset
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }

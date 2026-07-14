@@ -9,13 +9,13 @@ import { PRESET_THEMES } from "./data";
 import PartyMockup from "./components/PartyMockup";
 import ImageSearch from "./components/ImageSearch";
 import ClientProposal from "./components/ClientProposal";
-import {
-  Sparkles,
-  Layers,
-  FileSpreadsheet,
-  HelpCircle,
-  Heart,
-  Share2,
+import { 
+  Sparkles, 
+  Layers, 
+  FileSpreadsheet, 
+  HelpCircle, 
+  Heart, 
+  Share2, 
   MonitorPlay,
   Lightbulb,
   CheckCircle2,
@@ -29,7 +29,7 @@ export default function App() {
   // Primary app states
   const [activeTheme, setActiveTheme] = useState<ThemeConfig>(PRESET_THEMES[0]);
   const [activeTab, setActiveTab] = useState<"design" | "proposal">("design");
-
+  
   // Custom party layout state
   const [state, setState] = useState<PartySetupState>({
     shape: "round",
@@ -61,6 +61,7 @@ export default function App() {
     floorImageUrl: null,
     brightness: 100,
     gridVisible: false,
+    guideLineVisible: true,
     showRusticFloorItems: false,
     cylinderArrangement: "classic",
     cylinderSpacing: 0,
@@ -77,6 +78,14 @@ export default function App() {
     ],
     selectedPanelId: "panel_round_initial",
     imageFit: "cover",
+    cakeStands: [],
+    selectedCakeStandId: null,
+    neonNumbers: [],
+    selectedNeonNumberId: null,
+    ladderShelves: [],
+    selectedLadderShelfId: null,
+    trays: [],
+    selectedTrayId: null,
     cylinderTypes: ["cylinder", "cylinder", "cylinder"],
     cylinderStyles: ["matching", "matching", "matching"]
   });
@@ -126,7 +135,7 @@ export default function App() {
         const left = window.screenX + (window.outerWidth - width) / 2;
         const top = window.screenY + (window.outerHeight - height) / 2;
         const popup = window.open(data.url, "Google Sign-In", `width=${width},height=${height},left=${left},top=${top}`);
-
+        
         const handleMsg = (event: MessageEvent) => {
           if (event.data && event.data.type === "OAUTH_AUTH_SUCCESS") {
             fetch("/api/auth/me")
@@ -181,7 +190,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-emerald-500/30 selection:text-emerald-200">
-
+      
       {/* GLOBAL HEADER */}
       <header className="border-b border-slate-900 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -210,8 +219,8 @@ export default function App() {
             <button
               onClick={() => setActiveTab("design")}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === "design"
-                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/20"
+                activeTab === "design" 
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/20" 
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
@@ -221,8 +230,8 @@ export default function App() {
             <button
               onClick={() => setActiveTab("proposal")}
               className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
-                activeTab === "proposal"
-                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/20"
+                activeTab === "proposal" 
+                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-950/20" 
                   : "text-slate-400 hover:text-slate-200"
               }`}
             >
@@ -234,18 +243,18 @@ export default function App() {
           {/* User auth badge/actions */}
           {user ? (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 shadow-md">
-              <img
-                src={user.picture}
-                alt={user.name}
-                className="w-5 h-5 rounded-full object-cover border border-emerald-500/50"
+              <img 
+                src={user.picture} 
+                alt={user.name} 
+                className="w-5 h-5 rounded-full object-cover border border-emerald-500/50" 
                 referrerPolicy="no-referrer"
               />
               <span className="text-[11px] font-bold text-slate-200 hidden md:inline max-w-[120px] truncate">
                 {user.name}
               </span>
-              <button
-                onClick={handleLogout}
-                title="Sair da Conta Google"
+              <button 
+                onClick={handleLogout} 
+                title="Sair da Conta Google" 
                 className="text-slate-400 hover:text-red-400 p-1 transition-colors cursor-pointer"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -253,7 +262,7 @@ export default function App() {
             </div>
           ) : (
             <div className="flex items-center gap-2 bg-slate-900/50 p-1 rounded-xl border border-slate-800/60">
-              <button
+              <button 
                 onClick={handleDemoLogin}
                 className="px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 rounded-lg transition-all cursor-pointer"
                 title="Entrar no Modo de Demonstração Imediata"
@@ -278,7 +287,7 @@ export default function App() {
           <div className="flex items-center gap-2">
             <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-none" />
             <span>
-              <strong>Nota:</strong> Nenhuma chave de API do Gemini (GEMINI_API_KEY) foi configurada nos Segredos do AI Studio.
+              <strong>Nota:</strong> Nenhuma chave de API do Gemini (GEMINI_API_KEY) foi configurada nos Segredos do AI Studio. 
               O FestaCRAFT Pro está rodando em <strong>Modo de Demonstração Local</strong>, com paletas e estampas pré-carregadas completas de altíssima qualidade!
             </span>
           </div>
@@ -288,13 +297,13 @@ export default function App() {
 
       {/* CORE WORKSPACE */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-
+        
         {/* LEFT COLUMN: Controls & Generation Forms (Takes 5/12 cols) */}
         <section className="lg:col-span-5 flex flex-col gap-6 order-2 lg:order-1">
           {activeTab === "design" ? (
-            <ImageSearch
-              state={state}
-              activeTheme={activeTheme}
+            <ImageSearch 
+              state={state} 
+              activeTheme={activeTheme} 
               onUpdateState={handleUpdateState}
               onSelectTheme={handleSelectTheme}
             />
@@ -323,9 +332,9 @@ export default function App() {
             <div className="flex flex-col gap-6 h-full">
               {/* Interactive Mockup Staging Stage */}
               <div className="h-[340px] sm:h-[420px] lg:h-[500px]">
-                <PartyMockup
-                  state={state}
-                  activeTheme={activeTheme}
+                <PartyMockup 
+                  state={state} 
+                  activeTheme={activeTheme} 
                   onUpdateState={handleUpdateState}
                 />
               </div>
@@ -344,9 +353,9 @@ export default function App() {
               </div>
             </div>
           ) : (
-            <ClientProposal
-              state={state}
-              activeTheme={activeTheme}
+            <ClientProposal 
+              state={state} 
+              activeTheme={activeTheme} 
               onUpdateState={handleUpdateState}
             />
           )}

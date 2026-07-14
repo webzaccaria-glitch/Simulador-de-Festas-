@@ -44,7 +44,7 @@ interface ImageSearchProps {
 
 export default function ImageSearch({ state, activeTheme, onUpdateState, onSelectTheme }: ImageSearchProps) {
   // Step-by-step navigation state
-  const [activeStep, setActiveStep] = useState<"panels" | "balloons" | "cylinders" | "settings">("panels");
+  const [activeStep, setActiveStep] = useState<"panels" | "balloons" | "cylinders" | "decorations" | "settings">("panels");
 
   const [themeSearch, setThemeSearch] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -68,6 +68,17 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
   const [applyingImageUrl, setApplyingImageUrl] = useState<string | null>(null);
   const [selectedTarget, setSelectedTarget] = useState<string>("panel");
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  
+  // Neon numbers design states
+  const [selectedDigitToAdd, setSelectedDigitToAdd] = useState<number>(0);
+  const [selectedNeonColor, setSelectedNeonColor] = useState<string>("#FFFBEB");
+  
+  // Display ladder shelf states
+  const [selectedLadderColor, setSelectedLadderColor] = useState<string>("#D8A062");
+
+  // Tray (Bandeja) states
+  const [selectedTrayColor, setSelectedTrayColor] = useState<string>("#E11D48");
+  const [selectedTrayShape, setSelectedTrayShape] = useState<'rectangular_legs' | 'oval_beaded' | 'hexagonal'>('rectangular_legs');
 
   // Suggested loading states for visual feedback
   const imageLoadingStates = [
@@ -97,16 +108,18 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
     }
   }, [activeTheme]);
 
-  // Reactive Tab Selection based on user interactions with the 3D canvas
+  // Reactive Tab Selection & selectedTarget synchronization based on user interactions with the 3D canvas
   useEffect(() => {
     if (state.selectedBalloonId) {
       setActiveStep("balloons");
     } else if (state.selectedPanelId) {
       setActiveStep("panels");
+      setSelectedTarget(state.selectedPanelId);
     } else if (state.selectedCakeStandId) {
       setActiveStep("cylinders");
     } else if (state.selectedCylinderIndex !== undefined && state.selectedCylinderIndex !== null) {
       setActiveStep("cylinders");
+      setSelectedTarget(`cyl${state.selectedCylinderIndex}`);
     }
   }, [state.selectedBalloonId, state.selectedPanelId, state.selectedCakeStandId, state.selectedCylinderIndex]);
 
@@ -373,19 +386,21 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
             Configuração Guiada Passo a Passo
           </span>
           <span className="text-[10px] font-bold text-slate-500">
-            {activeStep === "panels" && "Etapa 1 de 4"}
-            {activeStep === "balloons" && "Etapa 2 de 4"}
-            {activeStep === "cylinders" && "Etapa 3 de 4"}
-            {activeStep === "settings" && "Etapa 4 de 4"}
+            {activeStep === "panels" && "Etapa 1 de 5"}
+            {activeStep === "balloons" && "Etapa 2 de 5"}
+            {activeStep === "cylinders" && "Etapa 3 de 5"}
+            {activeStep === "decorations" && "Etapa 4 de 5"}
+            {activeStep === "settings" && "Etapa 5 de 5"}
           </span>
         </div>
 
         {/* Dynamic Nav Tabs */}
-        <div className="grid grid-cols-4 gap-1 p-1 bg-slate-950 rounded-2xl border border-slate-900 shadow-inner">
+        <div className="grid grid-cols-5 gap-0.5 p-1 bg-slate-950 rounded-2xl border border-slate-900 shadow-inner">
           {[
             { id: "panels", label: "Painel", icon: ImageIcon, color: "text-blue-400", emoji: "🔴" },
             { id: "balloons", label: "Balões", icon: Wand2, color: "text-rose-400", emoji: "🎈" },
             { id: "cylinders", label: "Mesas", icon: Layers, color: "text-pink-400", emoji: "🪵" },
+            { id: "decorations", label: "Decor", icon: Sparkles, color: "text-amber-400", emoji: "✨" },
             { id: "settings", label: "Geral", icon: Settings2, color: "text-teal-400", emoji: "🟢" }
           ].map((step) => {
             const isSelected = activeStep === step.id;
@@ -403,11 +418,11 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                 <div className="flex items-center gap-0.5">
                   <span className="text-xs sm:text-sm">{step.emoji}</span>
                 </div>
-                <span className="text-[9.5px] font-extrabold tracking-tight hidden sm:inline">{step.label}</span>
+                <span className="text-[9px] font-extrabold tracking-tight hidden sm:inline">{step.label}</span>
                 {isSelected && (
                   <motion.div 
                     layoutId="activeStepIndicator" 
-                    className="absolute -bottom-1 left-1/3 right-1/3 h-[3px] bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" 
+                    className="absolute -bottom-1 left-1/4 right-1/4 h-[3px] bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" 
                   />
                 )}
               </button>
@@ -963,19 +978,19 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                 });
                 options.push({
                   id: "cyl0",
-                  name: "Cilindro Esquerdo (Pequeno)",
+                  name: "Cilindro P - Pequeno (Esquerdo)",
                   icon: "🥁",
                   category: "Cilindros / Mesas"
                 });
                 options.push({
                   id: "cyl1",
-                  name: "Cilindro Central (Grande)",
+                  name: "Cilindro G - Grande (Centro)",
                   icon: "🥁",
                   category: "Cilindros / Mesas"
                 });
                 options.push({
                   id: "cyl2",
-                  name: "Cilindro Direito (Médio)",
+                  name: "Cilindro M - Médio (Direito)",
                   icon: "🥁",
                   category: "Cilindros / Mesas"
                 });
@@ -996,7 +1011,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
 
               return (
                 <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
-                  <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden max-w-md w-full shadow-2xl flex flex-col p-6 space-y-4">
+                  <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-visible max-w-md w-full shadow-2xl flex flex-col p-6 space-y-4">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
                       <div className="flex items-center gap-2">
@@ -1877,31 +1892,81 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
 
                         {/* Image preview for this cylinder if Style is Custom Image */}
                         {currentStyle === "custom_images" && (
-                          <div className="p-2 bg-slate-950 rounded-lg border border-slate-850/80 flex items-center justify-between gap-2 animate-fadeIn">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <div className="w-6 h-6 rounded bg-slate-900 border border-slate-800 overflow-hidden flex-none">
-                                {currentImg ? (
-                                  <img src={currentImg} alt="Capa" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                                ) : (
-                                  <span className="text-[7px] text-slate-600 block text-center font-bold leading-6">PADRÃO</span>
-                                )}
+                          <div className="space-y-2.5 p-3 bg-slate-950 rounded-xl border border-slate-850/80 animate-fadeIn">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-slate-900 border border-slate-800 overflow-hidden flex-none">
+                                  {currentImg ? (
+                                    <img src={currentImg} alt="Capa" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                                  ) : (
+                                    <span className="text-[8px] text-slate-600 block text-center font-bold leading-8">PADRÃO</span>
+                                  )}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-[10px] font-bold text-slate-200">Estampa do Cilindro</span>
+                                  <span className="text-[8.5px] text-slate-400 truncate">
+                                    {currentImg ? "Capa temática carregada!" : "Sem imagem aplicada ainda"}
+                                  </span>
+                                </div>
                               </div>
-                              <span className="text-[8.5px] text-slate-400 truncate">
-                                {currentImg ? "Capa temática carregada!" : "Sem imagem. Use o Google Imagens no Passo 2."}
-                              </span>
+                              {currentImg && (
+                                <button
+                                  onClick={() => {
+                                    const updatedUrls = [...(state.cylinderUrls || [null, null, null])];
+                                    updatedUrls[cyl.idx] = null;
+                                    onUpdateState({ cylinderUrls: updatedUrls });
+                                  }}
+                                  className="text-[9px] text-rose-400 font-bold underline cursor-pointer hover:text-rose-300 px-1.5 py-1"
+                                >
+                                  Limpar
+                                </button>
+                              )}
                             </div>
-                            {currentImg && (
-                              <button
-                                onClick={() => {
-                                  const updatedUrls = [...(state.cylinderUrls || [null, null, null])];
-                                  updatedUrls[cyl.idx] = null;
-                                  onUpdateState({ cylinderUrls: updatedUrls });
-                                }}
-                                className="text-[8px] text-rose-400 font-bold underline cursor-pointer hover:text-rose-300"
-                              >
-                                Limpar
-                              </button>
-                            )}
+
+                            {/* Direct Paste & Image Search Buttons */}
+                            <div className="flex flex-col gap-1.5 pt-1.5 border-t border-slate-900">
+                              <span className="text-[8px] uppercase font-bold text-slate-500 tracking-wider">
+                                Definir Imagem para este Cilindro:
+                              </span>
+                              <div className="flex gap-1.5">
+                                <input 
+                                  type="text"
+                                  placeholder="Colar link da estampa..."
+                                  value={state.cylinderUrls?.[cyl.idx] || ""}
+                                  onChange={(e) => {
+                                    const updatedUrls = [...(state.cylinderUrls || [null, null, null])];
+                                    updatedUrls[cyl.idx] = e.target.value || null;
+                                    
+                                    const updatedStyles = [...(state.cylinderStyles || ["matching", "matching", "matching"])];
+                                    updatedStyles[cyl.idx] = "custom_images";
+
+                                    onUpdateState({ 
+                                      cylinderUrls: updatedUrls,
+                                      cylinderStyles: updatedStyles,
+                                      cylinderStyle: 'custom_images'
+                                    });
+                                  }}
+                                  className="flex-1 bg-slate-900 border border-slate-800 rounded-lg py-1 px-2.5 text-[9.5px] text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    // Scroll and switch to Image Search tab, setting the target to this cylinder
+                                    setActiveStep("panels");
+                                    setSelectedTarget(`cyl${cyl.idx}`);
+                                    // Pre-populate search query with theme and cylinder type
+                                    setSearchQuery(`${state.themeId || activeTheme.name} estampa cilindro`);
+                                    // Smooth scroll to top of Image Search component
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                  }}
+                                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-2 py-1 rounded-lg text-[9px] flex items-center gap-1 cursor-pointer transition-all active:scale-95 flex-none"
+                                  title="Buscar estampa no Google"
+                                >
+                                  <Search className="w-2.5 h-2.5" />
+                                  <span>Buscar</span>
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1911,6 +1976,13 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
               </div>
             </div>
 
+          </div>
+        )}
+
+        {/* ==================== TAB 4: DECORATIVE ITEMS (Cake Stands & Neon Numbers) ==================== */}
+        {activeStep === "decorations" && (
+          <div className="space-y-5 animate-fadeIn">
+            
             {/* Cake Stands (Suportes de Bolo & Doces) */}
             <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
               <div className="flex items-center justify-between mb-3">
@@ -1936,7 +2008,12 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                     };
                     onUpdateState({
                       cakeStands: [...currentStands, newStand],
-                      selectedCakeStandId: newId
+                      selectedCakeStandId: newId,
+                      selectedNeonNumberId: null,
+                      selectedCylinderIndex: null,
+                      selectedPanelId: null,
+                      selectedBalloonId: null,
+                      isTextSelected: false
                     });
                   }}
                   className="px-2 py-1 rounded bg-pink-600 hover:bg-pink-500 text-white text-[9.5px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
@@ -1973,7 +2050,14 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                           return (
                             <button
                               key={stand.id}
-                              onClick={() => onUpdateState({ selectedCakeStandId: stand.id })}
+                              onClick={() => onUpdateState({ 
+                                selectedCakeStandId: stand.id,
+                                selectedNeonNumberId: null,
+                                selectedCylinderIndex: null,
+                                selectedPanelId: null,
+                                selectedBalloonId: null,
+                                isTextSelected: false
+                              })}
                               className={`px-2.5 py-1 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
                                 isSelected
                                   ? "bg-pink-500/10 border-pink-500 text-pink-400 shadow-sm"
@@ -2141,6 +2225,769 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </div>
                 );
               })()}
+            </div>
+
+            {/* Trays Section (Bandejas Decorativas) */}
+            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🍱</span>
+                  <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
+                    Bandejas Decorativas
+                  </h4>
+                </div>
+                <button
+                  onClick={() => {
+                    const currentTrays = state.trays || [];
+                    const newId = `tray_${Date.now()}`;
+                    const newTray = {
+                      id: newId,
+                      shape: selectedTrayShape,
+                      x: 80 + (currentTrays.length * 30) % 150,
+                      y: 70 + (currentTrays.length * 15) % 60,
+                      w: 55,
+                      h: 40,
+                      color: selectedTrayColor,
+                      zIndex: 50 + currentTrays.length
+                    };
+                    onUpdateState({
+                      trays: [...currentTrays, newTray],
+                      selectedTrayId: newId,
+                      selectedCakeStandId: null,
+                      selectedNeonNumberId: null,
+                      selectedLadderShelfId: null,
+                      selectedCylinderIndex: null,
+                      selectedPanelId: null,
+                      selectedBalloonId: null,
+                      isTextSelected: false
+                    });
+                  }}
+                  className="px-2 py-1 rounded bg-teal-600 hover:bg-teal-500 text-white text-[9.5px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Adicionar</span>
+                </button>
+              </div>
+
+              <p className="text-slate-400 text-xs mb-4">
+                Adicione bandejas personalizáveis para compor a mesa de doces. Escolha entre 3 modelos elegantes, mude a cor e ajuste as dimensões:
+              </p>
+
+              {/* Shape choices before adding */}
+              {!state.selectedTrayId && (
+                <div className="mb-4 space-y-1.5">
+                  <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Modelo para adicionar:</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: 'rectangular_legs', label: 'Retangular c/ Pés', icon: '🍱' },
+                      { id: 'oval_beaded', label: 'Oval c/ Pérolas', icon: '🥚' },
+                      { id: 'hexagonal', label: 'Hexagonal', icon: '⬡' }
+                    ].map((model) => {
+                      const isSel = selectedTrayShape === model.id;
+                      return (
+                        <button
+                          key={model.id}
+                          onClick={() => setSelectedTrayShape(model.id as any)}
+                          className={`py-1.5 rounded-lg text-[9.5px] font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                            isSel
+                              ? "bg-slate-800 border-teal-500 text-teal-400"
+                              : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-300"
+                          }`}
+                        >
+                          <span className="text-sm">{model.icon}</span>
+                          <span>{model.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {(() => {
+                const traysList = state.trays || [];
+                const selectedTray = traysList.find(t => t.id === state.selectedTrayId) || null;
+
+                if (traysList.length === 0) {
+                  return (
+                    <div className="text-center py-6 bg-slate-950/40 rounded-xl border border-slate-850 text-xs text-slate-500 italic">
+                      Nenhuma bandeja inserida ainda. Escolha um modelo e toque em "Adicionar" acima!
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-3.5">
+                    {/* Horizontal Tray Switcher */}
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider flex-none">Bandejas ativas:</span>
+                      <div className="flex-1 flex flex-wrap gap-1">
+                        {traysList.map((tray, i) => {
+                          const isSelected = tray.id === state.selectedTrayId;
+                          let shapeLabel = tray.shape === 'rectangular_legs' ? 'Retang.' : tray.shape === 'oval_beaded' ? 'Oval' : 'Hex.';
+                          return (
+                            <button
+                              key={tray.id}
+                              onClick={() => onUpdateState({ 
+                                selectedTrayId: tray.id,
+                                selectedCakeStandId: null,
+                                selectedNeonNumberId: null,
+                                selectedLadderShelfId: null,
+                                selectedCylinderIndex: null,
+                                selectedPanelId: null,
+                                selectedBalloonId: null,
+                                isTextSelected: false
+                              })}
+                              className={`px-2.5 py-1 rounded-lg text-[9.5px] font-bold transition-all cursor-pointer border ${
+                                isSelected
+                                  ? "bg-teal-500/10 border-teal-500 text-teal-400 shadow-sm"
+                                  : "bg-slate-950 border-slate-855 text-slate-400 hover:text-slate-300"
+                              }`}
+                            >
+                              Bandeja {i + 1} ({shapeLabel})
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {selectedTray && (
+                      <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-850 space-y-3.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-teal-400 uppercase tracking-wider">
+                            Configurando Bandeja Selecionada
+                          </span>
+                          <button
+                            onClick={() => {
+                              const updated = traysList.filter(t => t.id !== selectedTray.id);
+                              onUpdateState({
+                                trays: updated,
+                                selectedTrayId: updated.length > 0 ? updated[0].id : null
+                              });
+                            }}
+                            className="text-[9.5px] text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Excluir</span>
+                          </button>
+                        </div>
+
+                        {/* Model / Shape Selector within active tray */}
+                        <div className="space-y-1">
+                          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Mudar Modelo:</span>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {[
+                              { id: 'rectangular_legs', label: 'Retangular c/ Pés', icon: '🍱' },
+                              { id: 'oval_beaded', label: 'Oval c/ Pérolas', icon: '🥚' },
+                              { id: 'hexagonal', label: 'Hexagonal', icon: '⬡' }
+                            ].map((model) => {
+                              const isSel = selectedTray.shape === model.id;
+                              return (
+                                <button
+                                  key={model.id}
+                                  onClick={() => {
+                                    const updated = traysList.map(t => t.id === selectedTray.id ? { ...t, shape: model.id as any } : t);
+                                    onUpdateState({ trays: updated });
+                                  }}
+                                  className={`py-1.5 rounded-lg text-[9.5px] font-bold border transition-all cursor-pointer flex flex-col items-center gap-1 ${
+                                    isSel
+                                      ? "bg-slate-800 border-teal-500 text-teal-400"
+                                      : "bg-slate-950 border-slate-855 text-slate-400 hover:text-slate-300"
+                                  }`}
+                                >
+                                  <span className="text-sm">{model.icon}</span>
+                                  <span>{model.label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Layering & Z-Index Row */}
+                        <div className="flex items-center justify-between bg-slate-950 p-2 rounded-lg border border-slate-900">
+                          <span className="text-[9.5px] text-slate-400 font-bold">Camada / Empilhamento:</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                const currentZ = selectedTray.zIndex ?? 50;
+                                let nextZ = currentZ;
+                                if (currentZ < 45) {
+                                  nextZ = 45;
+                                } else {
+                                  const otherTrays = traysList.filter(t => t.id !== selectedTray.id);
+                                  const maxOtherZ = otherTrays.length > 0 ? Math.max(...otherTrays.map(t => t.zIndex ?? 50)) : 45;
+                                  nextZ = Math.max(currentZ + 1, maxOtherZ + 1);
+                                }
+                                const updated = traysList.map(t => t.id === selectedTray.id ? { ...t, zIndex: nextZ } : t);
+                                onUpdateState({ trays: updated });
+                              }}
+                              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-[9px] font-bold text-slate-300 cursor-pointer"
+                            >
+                              Frente
+                            </button>
+                            <button
+                              onClick={() => {
+                                const currentZ = selectedTray.zIndex ?? 50;
+                                let nextZ = currentZ;
+                                if (currentZ >= 45) {
+                                  nextZ = 40;
+                                } else {
+                                  nextZ = Math.max(12, currentZ - 1);
+                                }
+                                const updated = traysList.map(t => t.id === selectedTray.id ? { ...t, zIndex: nextZ } : t);
+                                onUpdateState({ trays: updated });
+                              }}
+                              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-750 text-[9px] font-bold text-slate-300 cursor-pointer"
+                            >
+                              Atrás
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Width Slider */}
+                        <div>
+                          <div className="flex justify-between items-center text-[10px] text-slate-400 mb-1">
+                            <span>Tamanho da Bandeja:</span>
+                            <span className="font-mono text-slate-400 font-bold">{selectedTray.w}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="30"
+                            max="150"
+                            value={selectedTray.w}
+                            onChange={(e) => {
+                              const newW = parseInt(e.target.value);
+                              const newH = Math.round(newW * 0.73);
+                              const updated = traysList.map(t => t.id === selectedTray.id ? { ...t, w: newW, h: newH } : t);
+                              onUpdateState({ trays: updated });
+                            }}
+                            className="w-full accent-teal-500 h-1 bg-slate-800 rounded-lg cursor-pointer appearance-none"
+                          />
+                        </div>
+
+                        {/* Color selection row */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-bold text-slate-400 block">Cor da Bandeja:</span>
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 flex flex-wrap gap-1.5">
+                              {[
+                                { hex: "#E11D48", label: "Vermelho" },
+                                { hex: "#EC4899", label: "Rosa Candy" },
+                                { hex: "#F472B6", label: "Rosa Claro" },
+                                { hex: "#3B82F6", label: "Azul Bebê" },
+                                { hex: "#10B981", label: "Verde Menta" },
+                                { hex: "#F59E0B", label: "Amarelo / Ouro" },
+                                { hex: "#D4AF37", label: "Dourado Metálico" },
+                                { hex: "#8B5CF6", label: "Lilás" },
+                                { hex: "#FFFFFF", label: "Branco" },
+                                { hex: "#78350F", label: "Madeira / Cobre" },
+                                { hex: "#1E293B", label: "Grafite" }
+                              ].map((colorPreset) => {
+                                const isSelected = selectedTray.color.toUpperCase() === colorPreset.hex.toUpperCase();
+                                return (
+                                  <button
+                                    key={colorPreset.hex}
+                                    onClick={() => {
+                                      const updated = traysList.map(t => t.id === selectedTray.id ? { ...t, color: colorPreset.hex } : t);
+                                      onUpdateState({ trays: updated });
+                                    }}
+                                    className="w-5.5 h-5.5 rounded-full border border-white/10 relative flex items-center justify-center cursor-pointer transition-transform hover:scale-110"
+                                    style={{ backgroundColor: colorPreset.hex }}
+                                    title={colorPreset.label}
+                                  >
+                                    {isSelected && (
+                                      <Check className={`w-3 h-3 ${colorPreset.hex === "#FFFFFF" ? "text-slate-900" : "text-white"}`} />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+
+                            <div className="relative flex flex-col items-center flex-none">
+                              <input
+                                type="color"
+                                value={selectedTray.color}
+                                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
+                                onChange={(e) => {
+                                  const updated = traysList.map(t => t.id === selectedTray.id ? { ...t, color: e.target.value.toUpperCase() } : t);
+                                  onUpdateState({ trays: updated });
+                                }}
+                              />
+                              <div className="w-6 h-6 rounded bg-gradient-to-tr from-rose-500 via-amber-400 to-indigo-500 border border-slate-700 flex items-center justify-center cursor-pointer">
+                                <Paintbrush className="w-3 h-3 text-white" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Neon Numbers Section */}
+            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">✨</span>
+                  <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
+                    Números de Neon LED
+                  </h4>
+                </div>
+              </div>
+
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Adicione números iluminados com brilho neon. Perfeitos para decorar painéis ou mesas. Escolha de 0 a 9 e ajuste livremente!
+              </p>
+
+              {/* Number Selector Grid 0 to 9 */}
+              <div className="space-y-2">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Escolha o número:</span>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => {
+                    const isCurrentSelected = state.selectedNeonNumberId && 
+                      (state.neonNumbers || []).find(n => n.id === state.selectedNeonNumberId)?.number === num;
+                    return (
+                      <button
+                        key={num}
+                        onClick={() => {
+                          const list = state.neonNumbers || [];
+                          const activeSelected = list.find(n => n.id === state.selectedNeonNumberId);
+                          if (activeSelected) {
+                            // If an item is already selected, update its value!
+                            const updated = list.map(n => n.id === activeSelected.id ? { ...n, number: num } : n);
+                            onUpdateState({ neonNumbers: updated });
+                          } else {
+                            setSelectedDigitToAdd(num);
+                          }
+                        }}
+                        className={`py-2 rounded-xl font-sans font-black text-sm flex items-center justify-center transition-all cursor-pointer border ${
+                          (!state.selectedNeonNumberId && selectedDigitToAdd === num)
+                            ? "bg-amber-500/10 border-amber-500 text-amber-400 shadow-lg scale-105"
+                            : isCurrentSelected
+                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-400 shadow-sm"
+                            : "bg-slate-950 border-slate-850 text-slate-300 hover:border-slate-700 hover:text-white"
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Color options for neon glow */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Cor do Brilho Neon:</span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { hex: "#FFFBEB", label: "Branco Quente" },
+                    { hex: "#F1F5F9", label: "Branco Frio" },
+                    { hex: "#FF2E93", label: "Rosa Neon" },
+                    { hex: "#00E5FF", label: "Azul Ice" },
+                    { hex: "#39FF14", label: "Verde Neon" },
+                    { hex: "#FF073A", label: "Vermelho" },
+                    { hex: "#B026FF", label: "Roxo" }
+                  ].map((preset) => {
+                    const activeSelected = (state.neonNumbers || []).find(n => n.id === state.selectedNeonNumberId);
+                    const isSelected = activeSelected 
+                      ? activeSelected.color === preset.hex 
+                      : selectedNeonColor === preset.hex;
+
+                    return (
+                      <button
+                        key={preset.hex}
+                        onClick={() => {
+                          if (activeSelected) {
+                            const updated = (state.neonNumbers || []).map(n => n.id === activeSelected.id ? { ...n, color: preset.hex } : n);
+                            onUpdateState({ neonNumbers: updated });
+                          } else {
+                            setSelectedNeonColor(preset.hex);
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[9.5px] font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                          isSelected
+                            ? "bg-slate-800 border-slate-600 text-white shadow-sm"
+                            : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-300"
+                        }`}
+                      >
+                        <div className="w-2 h-2 rounded-full shadow-[0_0_4px_currentColor]" style={{ backgroundColor: preset.hex, color: preset.hex }} />
+                        <span>{preset.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Buttons: Add, Increase, Decrease */}
+              <div className="pt-2 flex flex-col gap-2">
+                {!state.selectedNeonNumberId ? (
+                  <button
+                    onClick={() => {
+                      const currentNumbers = state.neonNumbers || [];
+                      const newId = `neon_num_${Date.now()}`;
+                      const newNum = {
+                        id: newId,
+                        number: selectedDigitToAdd,
+                        color: selectedNeonColor,
+                        x: 100 + (currentNumbers.length * 30) % 150,
+                        y: 110 + (currentNumbers.length * 15) % 60,
+                        w: 55, // default width
+                        h: 77, // default height (1.4 ratio)
+                        zIndex: 65 + currentNumbers.length
+                      };
+                      onUpdateState({
+                        neonNumbers: [...currentNumbers, newNum],
+                        selectedNeonNumberId: newId,
+                        selectedCakeStandId: null,
+                        selectedCylinderIndex: null,
+                        selectedPanelId: null,
+                        selectedBalloonId: null,
+                        isTextSelected: false
+                      });
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-lg transition-transform active:scale-[0.98]"
+                  >
+                    <Plus className="w-4 h-4 text-slate-950" />
+                    <span>Adicionar Número {selectedDigitToAdd} no Cenário</span>
+                  </button>
+                ) : (
+                  (() => {
+                    const activeNum = (state.neonNumbers || []).find(n => n.id === state.selectedNeonNumberId);
+                    if (!activeNum) return null;
+                    return (
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-850 space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-900 pb-1.5">
+                          <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider">
+                            Número {activeNum.number} Selecionado
+                          </span>
+                          <button
+                            onClick={() => {
+                              const updated = (state.neonNumbers || []).filter(n => n.id !== activeNum.id);
+                              onUpdateState({
+                                neonNumbers: updated,
+                                selectedNeonNumberId: null
+                              });
+                            }}
+                            className="text-[9px] text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Remover</span>
+                          </button>
+                        </div>
+
+                        {/* Aumentar and Diminuir Controls */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Ajustar Tamanho:</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => {
+                                const updated = (state.neonNumbers || []).map(n => {
+                                  if (n.id === activeNum.id) {
+                                    const nextW = Math.max(30, n.w - 8);
+                                    const nextH = Math.round(nextW * 1.4);
+                                    return { ...n, w: nextW, h: nextH };
+                                  }
+                                  return n;
+                                });
+                                onUpdateState({ neonNumbers: updated });
+                              }}
+                              className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-800 flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                              title="Diminuir o tamanho do número de neon"
+                            >
+                              <span className="text-sm font-black">-</span>
+                              <span>Diminuir</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                const updated = (state.neonNumbers || []).map(n => {
+                                  if (n.id === activeNum.id) {
+                                    const nextW = Math.min(220, n.w + 8);
+                                    const nextH = Math.round(nextW * 1.4);
+                                    return { ...n, w: nextW, h: nextH };
+                                  }
+                                  return n;
+                                });
+                                onUpdateState({ neonNumbers: updated });
+                              }}
+                              className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-800 flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                              title="Aumentar o tamanho do número de neon"
+                            >
+                              <span className="text-sm font-black">+</span>
+                              <span>Aumentar</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Slider for more precise size control */}
+                        <div>
+                          <div className="flex justify-between items-center text-[10px] text-slate-500">
+                            <span>Largura precisa:</span>
+                            <span className="font-mono text-slate-400 font-bold">{activeNum.w}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="30"
+                            max="200"
+                            value={activeNum.w}
+                            onChange={(e) => {
+                              const newW = parseInt(e.target.value);
+                              const newH = Math.round(newW * 1.4);
+                              const updated = (state.neonNumbers || []).map(n => n.id === activeNum.id ? { ...n, w: newW, h: newH } : n);
+                              onUpdateState({ neonNumbers: updated });
+                            }}
+                            className="w-full accent-amber-500 h-1 bg-slate-900 rounded-lg cursor-pointer appearance-none mt-1"
+                          />
+                        </div>
+
+                        {/* Layering stack order */}
+                        <div className="flex items-center justify-between bg-slate-900 p-2 rounded-lg border border-slate-850 text-xs">
+                          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Camada:</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                const updated = (state.neonNumbers || []).map(n => n.id === activeNum.id ? { ...n, zIndex: Math.max(1, (n.zIndex ?? 60) - 5) } : n);
+                                onUpdateState({ neonNumbers: updated });
+                              }}
+                              className="px-2 py-0.5 rounded bg-slate-850 hover:bg-slate-800 text-[10px] font-bold text-slate-300 cursor-pointer"
+                            >
+                              Trás
+                            </button>
+                            <span className="font-mono text-[9px] text-slate-400 px-1 font-bold">{activeNum.zIndex ?? 60}</span>
+                            <button
+                              onClick={() => {
+                                const updated = (state.neonNumbers || []).map(n => n.id === activeNum.id ? { ...n, zIndex: Math.min(100, (n.zIndex ?? 60) + 5) } : n);
+                                onUpdateState({ neonNumbers: updated });
+                              }}
+                              className="px-2 py-0.5 rounded bg-slate-850 hover:bg-slate-800 text-[10px] font-bold text-slate-300 cursor-pointer"
+                            >
+                              Frente
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Tip for users */}
+                        <p className="text-[10px] text-slate-500 italic text-center">
+                          💡 Dica: Você também pode arrastar o número {activeNum.number} livremente pelo cenário!
+                        </p>
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
+            </div>
+
+            {/* MDF Display Ladder Shelf Section */}
+            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🪜</span>
+                  <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
+                    Estantes Escadas de MDF
+                  </h4>
+                </div>
+              </div>
+
+              <p className="text-slate-400 text-xs leading-relaxed">
+                Adicione estantes tipo escada de MDF para colocar doces e lembrancinhas. Arraste e posicione livremente pelo cenário da festa!
+              </p>
+
+              {/* Color choices */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Acabamento / Cor:</span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { hex: "#D8A062", label: "MDF Cru" },
+                    { hex: "#F3F4F6", label: "Branco Lacado" },
+                    { hex: "#5C4033", label: "Madeira Rústica" },
+                    { hex: "#FBCFE8", label: "Rosa Candy" },
+                    { hex: "#BFDBFE", label: "Azul Candy" }
+                  ].map((preset) => {
+                    const activeLadder = (state.ladderShelves || []).find(l => l.id === state.selectedLadderShelfId);
+                    const isSelected = activeLadder 
+                      ? activeLadder.color === preset.hex 
+                      : selectedLadderColor === preset.hex;
+
+                    return (
+                      <button
+                        key={preset.hex}
+                        onClick={() => {
+                          if (activeLadder) {
+                            const updated = (state.ladderShelves || []).map(l => l.id === activeLadder.id ? { ...l, color: preset.hex } : l);
+                            onUpdateState({ ladderShelves: updated });
+                          } else {
+                            setSelectedLadderColor(preset.hex);
+                          }
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-[9.5px] font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                          isSelected
+                            ? "bg-slate-800 border-slate-600 text-white shadow-sm"
+                            : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-300"
+                        }`}
+                      >
+                        <div className="w-2.5 h-2.5 rounded border border-slate-700" style={{ backgroundColor: preset.hex }} />
+                        <span>{preset.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Buttons: Add, Increase, Decrease */}
+              <div className="pt-2 flex flex-col gap-2">
+                {!state.selectedLadderShelfId ? (
+                  <button
+                    onClick={() => {
+                      const currentLadders = state.ladderShelves || [];
+                      const newId = `ladder_${Date.now()}`;
+                      const newLadder = {
+                        id: newId,
+                        color: selectedLadderColor,
+                        x: 150 + (currentLadders.length * 40) % 150,
+                        y: 80 + (currentLadders.length * 20) % 60,
+                        w: 70, // default width
+                        h: 110, // default height
+                        zIndex: 50 + currentLadders.length
+                      };
+                      onUpdateState({
+                        ladderShelves: [...currentLadders, newLadder],
+                        selectedLadderShelfId: newId,
+                        selectedCakeStandId: null,
+                        selectedNeonNumberId: null,
+                        selectedCylinderIndex: null,
+                        selectedPanelId: null,
+                        selectedBalloonId: null,
+                        isTextSelected: false
+                      });
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-lg transition-transform active:scale-[0.98]"
+                  >
+                    <Plus className="w-4 h-4 text-slate-950" />
+                    <span>Adicionar Estante Escada</span>
+                  </button>
+                ) : (
+                  (() => {
+                    const activeLadder = (state.ladderShelves || []).find(l => l.id === state.selectedLadderShelfId);
+                    if (!activeLadder) return null;
+                    return (
+                      <div className="p-3 bg-slate-950 rounded-xl border border-slate-850 space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-900 pb-1.5">
+                          <span className="text-[10px] font-black text-teal-400 uppercase tracking-wider">
+                            Estante Escada Selecionada
+                          </span>
+                          <button
+                            onClick={() => {
+                              const updated = (state.ladderShelves || []).filter(l => l.id !== activeLadder.id);
+                              onUpdateState({
+                                ladderShelves: updated,
+                                selectedLadderShelfId: null
+                              });
+                            }}
+                            className="text-[9px] text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Remover</span>
+                          </button>
+                        </div>
+
+                        {/* Adjust Size */}
+                        <div className="space-y-1.5">
+                          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Ajustar Tamanho:</span>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={() => {
+                                const updated = (state.ladderShelves || []).map(l => {
+                                  if (l.id === activeLadder.id) {
+                                    const nextW = Math.max(40, l.w - 8);
+                                    const nextH = Math.round(nextW * 1.57); // maintain ratio ~1.57
+                                    return { ...l, w: nextW, h: nextH };
+                                  }
+                                  return l;
+                                });
+                                onUpdateState({ ladderShelves: updated });
+                              }}
+                              className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-800 flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                            >
+                              <span className="text-sm font-black">-</span>
+                              <span>Diminuir</span>
+                            </button>
+
+                            <button
+                              onClick={() => {
+                                const updated = (state.ladderShelves || []).map(l => {
+                                  if (l.id === activeLadder.id) {
+                                    const nextW = Math.min(200, l.w + 8);
+                                    const nextH = Math.round(nextW * 1.57);
+                                    return { ...l, w: nextW, h: nextH };
+                                  }
+                                  return l;
+                                });
+                                onUpdateState({ ladderShelves: updated });
+                              }}
+                              className="py-2 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold border border-slate-800 flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95"
+                            >
+                              <span className="text-sm font-black">+</span>
+                              <span>Aumentar</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Slider for precision */}
+                        <div>
+                          <div className="flex justify-between items-center text-[10px] text-slate-500">
+                            <span>Largura precisa:</span>
+                            <span className="font-mono text-slate-400 font-bold">{activeLadder.w}px</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="40"
+                            max="200"
+                            value={activeLadder.w}
+                            onChange={(e) => {
+                              const newW = parseInt(e.target.value);
+                              const newH = Math.round(newW * 1.57);
+                              const updated = (state.ladderShelves || []).map(l => l.id === activeLadder.id ? { ...l, w: newW, h: newH } : l);
+                              onUpdateState({ ladderShelves: updated });
+                            }}
+                            className="w-full accent-teal-500 h-1 bg-slate-900 rounded-lg cursor-pointer appearance-none mt-1"
+                          />
+                        </div>
+
+                        {/* Layering stack order */}
+                        <div className="flex items-center justify-between bg-slate-900 p-2 rounded-lg border border-slate-850 text-xs">
+                          <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider">Camada:</span>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                const updated = (state.ladderShelves || []).map(l => l.id === activeLadder.id ? { ...l, zIndex: Math.max(1, (l.zIndex ?? 50) - 5) } : l);
+                                onUpdateState({ ladderShelves: updated });
+                              }}
+                              className="px-2 py-0.5 rounded bg-slate-850 hover:bg-slate-800 text-[10px] font-bold text-slate-300 cursor-pointer"
+                            >
+                              Trás
+                            </button>
+                            <span className="font-mono text-[9px] text-slate-400 px-1 font-bold">{activeLadder.zIndex ?? 50}</span>
+                            <button
+                              onClick={() => {
+                                const updated = (state.ladderShelves || []).map(l => l.id === activeLadder.id ? { ...l, zIndex: Math.min(100, (l.zIndex ?? 50) + 5) } : l);
+                                onUpdateState({ ladderShelves: updated });
+                              }}
+                              className="px-2 py-0.5 rounded bg-slate-850 hover:bg-slate-800 text-[10px] font-bold text-slate-300 cursor-pointer"
+                            >
+                              Frente
+                            </button>
+                          </div>
+                        </div>
+
+                        <p className="text-[10px] text-slate-500 italic text-center">
+                          💡 Dica: Você também pode arrastar a estante livremente pelo cenário!
+                        </p>
+                      </div>
+                    );
+                  })()
+                )}
+              </div>
             </div>
 
           </div>

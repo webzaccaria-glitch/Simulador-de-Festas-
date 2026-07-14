@@ -54,6 +54,38 @@ export interface CakeStandItem {
   zIndex?: number;
 }
 
+export interface NeonNumberItem {
+  id: string;
+  number: number; // 0 to 9
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: string; // Hex color (e.g. #FFFBEB, #EF4444, etc)
+  zIndex?: number;
+}
+
+export interface LadderShelfItem {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: string; // Hex/preset color for MDF, wood, etc.
+  zIndex?: number;
+}
+
+export interface TrayItem {
+  id: string;
+  shape: 'rectangular_legs' | 'oval_beaded' | 'hexagonal';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: string;
+  zIndex?: number;
+}
+
 export interface BalloonItem {
   id: string;
   type: 'column' | 'arch';
@@ -88,6 +120,7 @@ export interface PartySetupState {
   floorImageUrl?: string | null;
   brightness: number; // percentage
   gridVisible: boolean;
+  guideLineVisible?: boolean;
   showRusticFloorItems?: boolean;
   cylinderArrangement?: 'classic' | 'staircase' | 'descending' | 'triangular';
   cylinderSpacing?: number; // spacing offset, default 0
@@ -118,6 +151,12 @@ export interface PartySetupState {
   imageFit?: 'cover' | 'contain' | 'fill';
   cakeStands?: CakeStandItem[];
   selectedCakeStandId?: string | null;
+  neonNumbers?: NeonNumberItem[];
+  selectedNeonNumberId?: string | null;
+  ladderShelves?: LadderShelfItem[];
+  selectedLadderShelfId?: string | null;
+  trays?: TrayItem[];
+  selectedTrayId?: string | null;
   cylinderTypes?: ('cylinder' | 'slatted_table' | 'fluted_cylinder' | 'acrylic_table' | 'oval_drawers_table' | 'rectangular_counter' | 'classic_buffet' | 'gold_wireframe')[];
   cylinderStyles?: ('matching' | 'solid_colors' | 'rustic_wood' | 'kraft_mdf' | 'custom_images')[];
   textX?: number;
