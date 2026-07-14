@@ -1097,8 +1097,8 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       const dx = (e.clientX - startX) / zoom;
       const dy = (e.clientY - startY) / zoom;
 
-      const nextX = Math.max(-200, Math.min(450, startNumX + dx));
-      const nextY = Math.max(-100, Math.min(400, startNumY - dy));
+      const nextX = startNumX + dx;
+      const nextY = startNumY - dy;
 
       const updated = numbers.map(n => n.id === numId ? { ...n, x: nextX, y: nextY } : n);
       onUpdateState({ neonNumbers: updated });
@@ -1114,13 +1114,13 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       let newH = num.h;
 
       if (type === "width") {
-        newW = Math.max(30, Math.min(300, startW + dx));
+        newW = Math.max(20, startW + dx);
       } else if (type === "height") {
-        newH = Math.max(30, Math.min(400, startH - dy));
+        newH = Math.max(20, startH - dy);
       } else if (type === "diagonal") {
         const ratio = (startW + dx) / startW;
-        newW = Math.max(30, Math.min(300, startW + dx));
-        newH = Math.max(30, Math.min(400, startH * ratio));
+        newW = Math.max(20, startW + dx);
+        newH = Math.max(20, startH * ratio);
       }
 
       const updated = numbers.map(n => n.id === numId ? { ...n, w: newW, h: newH } : n);

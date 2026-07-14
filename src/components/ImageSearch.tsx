@@ -2684,7 +2684,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                               onClick={() => {
                                 const updated = (state.neonNumbers || []).map(n => {
                                   if (n.id === activeNum.id) {
-                                    const nextW = Math.max(30, n.w - 8);
+                                    const nextW = Math.max(20, n.w - 8);
                                     const nextH = Math.round(nextW * 1.4);
                                     return { ...n, w: nextW, h: nextH };
                                   }
@@ -2703,7 +2703,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                               onClick={() => {
                                 const updated = (state.neonNumbers || []).map(n => {
                                   if (n.id === activeNum.id) {
-                                    const nextW = Math.min(220, n.w + 8);
+                                    const nextW = n.w + 8;
                                     const nextH = Math.round(nextW * 1.4);
                                     return { ...n, w: nextW, h: nextH };
                                   }
@@ -2728,8 +2728,8 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                           </div>
                           <input
                             type="range"
-                            min="30"
-                            max="200"
+                            min="20"
+                            max="1000"
                             value={activeNum.w}
                             onChange={(e) => {
                               const newW = parseInt(e.target.value);
