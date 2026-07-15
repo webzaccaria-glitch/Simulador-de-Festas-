@@ -200,7 +200,7 @@ export default function App() {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="font-sans font-black text-lg tracking-tight text-slate-100">
-                FestaCRAFT Pro
+                FestDecor3D
               </h1>
               <span className="text-[10px] uppercase font-extrabold tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 Estúdio IA
@@ -288,7 +288,7 @@ export default function App() {
             <AlertCircle className="w-3.5 h-3.5 text-amber-400 flex-none" />
             <span>
               <strong>Nota:</strong> Nenhuma chave de API do Gemini (GEMINI_API_KEY) foi configurada nos Segredos do AI Studio. 
-              O FestaCRAFT Pro está rodando em <strong>Modo de Demonstração Local</strong>, com paletas e estampas pré-carregadas completas de altíssima qualidade!
+              O FestDecor3D está rodando em <strong>Modo de Demonstração Local</strong>, com paletas e estampas pré-carregadas completas de altíssima qualidade!
             </span>
           </div>
           <span className="hidden md:inline-block text-[9px] uppercase font-bold text-slate-500">Modo Demo Ativo</span>
@@ -365,7 +365,7 @@ export default function App() {
 
       {/* FOOTER */}
       <footer className="border-t border-slate-900 bg-slate-950 mt-auto py-6 px-6 text-center text-slate-500 text-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p>© 2026 FestaCRAFT Studio. Desenvolvido para Designers, Decoradores e Gráficas Rápidas de Sublimação.</p>
+        <p>© 2026 FestDecor3D. Desenvolvido para Designers, Decoradores e Gráficas Rápidas de Sublimação.</p>
         <div className="flex items-center gap-1 text-[11px]">
           <span>Feito com</span>
           <Heart className="w-3 h-3 text-red-500 fill-red-500 inline mx-0.5" />
