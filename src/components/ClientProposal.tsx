@@ -28,6 +28,8 @@ export default function ClientProposal({ state, activeTheme, onUpdateState }: Cl
     priceDecorations: 120.00,
     priceTotal: 900.00,
     themeId: activeTheme.id,
+    conceptTitle: "",
+    conceptDescription: "",
   });
 
   const [isSaved, setIsSaved] = useState(false);
@@ -66,8 +68,8 @@ export default function ClientProposal({ state, activeTheme, onUpdateState }: Cl
     
 Olá *${proposal.clientName}*! Aqui está o layout virtual e a proposta de orçamento para a sua festa:
 
-*Tema:* ${activeTheme.name}
-*Data:* ${formattedDate}
+*Conceito:* ${proposal.conceptTitle || "Personalizado"}
+${proposal.conceptDescription ? `*Descrição:* ${proposal.conceptDescription}\n` : ""}*Data:* ${formattedDate}
 *Local:* ${proposal.eventLocation}
 
 *Itens Inclusos no Projeto:*
@@ -196,6 +198,33 @@ Ficamos à disposição para fechamento de contrato!`;
               value={proposal.notes}
               onChange={(e) => handleTextChange("notes", e.target.value)}
               rows={2}
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 resize-none"
+            />
+          </div>
+
+          {/* Custom Concept Title */}
+          <div className="flex flex-col gap-1 md:col-span-2 border-t border-slate-800/60 pt-4 mt-2">
+            <label className="text-[10px] uppercase font-bold text-emerald-450 flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-emerald-400" />
+              <span>Conceito Criativo (Título Personalizado):</span>
+            </label>
+            <input
+              type="text"
+              value={proposal.conceptTitle || ""}
+              onChange={(e) => handleTextChange("conceptTitle", e.target.value)}
+              placeholder="Digite o título do conceito criativo do projeto (ex: Jardim Encantado Minimalista)"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 px-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
+            />
+          </div>
+
+          {/* Custom Concept Description */}
+          <div className="flex flex-col gap-1 md:col-span-2">
+            <label className="text-[10px] uppercase font-bold text-emerald-450">Descrição do Conceito Criativo:</label>
+            <textarea
+              value={proposal.conceptDescription || ""}
+              onChange={(e) => handleTextChange("conceptDescription", e.target.value)}
+              placeholder="Digite livremente a descrição do conceito criativo do projeto..."
+              rows={3}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 resize-none"
             />
           </div>
@@ -334,9 +363,9 @@ Ficamos à disposição para fechamento de contrato!`;
           {/* Theme specifications description */}
           <div className="mb-5">
             <span className="text-slate-400 font-extrabold block uppercase tracking-wider text-[8px] mb-1.5">Conceito Criativo & Paleta de Cores</span>
-            <h5 className="font-bold text-slate-900 text-sm">{activeTheme.name}</h5>
-            <p className="text-slate-600 text-[11px] leading-relaxed mt-1">
-              {activeTheme.description}
+            <h5 className="font-bold text-slate-900 text-sm">{proposal.conceptTitle || "Digite o conceito criativo do projeto"}</h5>
+            <p className="text-slate-600 text-[11px] leading-relaxed mt-1 whitespace-pre-line">
+              {proposal.conceptDescription || "Digite a descrição do conceito criativo..."}
             </p>
 
             <div className="flex gap-2 items-center mt-3.5">
@@ -488,9 +517,9 @@ Ficamos à disposição para fechamento de contrato!`;
               <div className="flex flex-col gap-4">
                 <div>
                   <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Conceito do Tema</span>
-                  <h4 className="text-lg font-extrabold text-emerald-400 mt-1">{activeTheme.name}</h4>
-                  <p className="text-slate-300 text-xs leading-relaxed mt-2 bg-slate-950 p-4 rounded-xl border border-slate-800">
-                    {activeTheme.description}
+                  <h4 className="text-lg font-extrabold text-emerald-400 mt-1">{proposal.conceptTitle || "Sem título do conceito"}</h4>
+                  <p className="text-slate-300 text-xs leading-relaxed mt-2 bg-slate-950 p-4 rounded-xl border border-slate-800 whitespace-pre-line">
+                    {proposal.conceptDescription || "Sem descrição do conceito."}
                   </p>
                 </div>
 

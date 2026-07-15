@@ -3095,41 +3095,60 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
 
             {/* Sublimation Image Fit adjustments */}
             <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl flex flex-col gap-4">
-              <div>
-                <div className="flex items-center gap-2 mb-3">
-                  <Layers className="w-4.5 h-4.5 text-teal-400" />
-                  <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
-                    Ajuste de Preenchimento da Imagem (Sublimação)
-                  </h4>
-                </div>
-                <p className="text-slate-400 text-xs mb-4">
-                  Como a estampa deve se ajustar ao formato físico da maquete. Ideal para alinhar proporções de costuras reais:
-                </p>
+              {(() => {
+                const currentPanels = getActivePanels(state);
+                const selectedPanel = currentPanels.find(p => p.id === state.selectedPanelId);
+                const panelFit = selectedPanel ? (selectedPanel.imageFit || "cover") : (state.imageFit || "cover");
 
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: "cover", label: "Cortar Bordas", desc: "Preenche mantendo proporção original" },
-                    { id: "contain", label: "Mostrar Inteira", desc: "Ajusta arte inteira dentro da forma" },
-                    { id: "fill", label: "Esticar", desc: "Distorce para cobrir tudo sem cortes" }
-                  ].map((fit) => {
-                    const isSelected = (state.imageFit || "cover") === fit.id;
-                    return (
-                      <button
-                        key={fit.id}
-                        onClick={() => onUpdateState({ imageFit: fit.id as any })}
-                        className={`px-2 py-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
-                          isSelected
-                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold"
-                            : "bg-slate-950 border-slate-855 hover:border-slate-700 text-slate-400"
-                        }`}
-                      >
-                        <span className="text-[10px] font-bold leading-tight">{fit.label}</span>
-                        <span className="text-[8px] opacity-70 leading-normal text-center">{fit.desc}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+                return (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Layers className="w-4.5 h-4.5 text-teal-400" />
+                      <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
+                        Ajuste de Preenchimento da Imagem (Sublimação)
+                      </h4>
+                    </div>
+                    <p className="text-slate-400 text-xs mb-4">
+                      Como a estampa deve se ajustar ao formato físico da maquete. Ideal para alinhar proporções de costuras reais:
+                    </p>
+
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {[
+                        { id: "cover", label: "Cortar Bordas", desc: "Preenche mantendo proporção original" },
+                        { id: "contain", label: "Mostrar Inteira", desc: "Ajusta arte inteira dentro da forma" },
+                        { id: "fill", label: "Esticar", desc: "Distorce para cobrir tudo sem cortes" }
+                      ].map((fit) => {
+                        const isSelected = panelFit === fit.id;
+                        return (
+                          <button
+                            key={fit.id}
+                            onClick={() => {
+                              if (selectedPanel) {
+                                const updated = currentPanels.map(p => 
+                                  p.id === selectedPanel.id 
+                                    ? { ...p, imageFit: fit.id as any } 
+                                    : p
+                                );
+                                onUpdateState({ panels: updated, imageFit: fit.id as any });
+                              } else {
+                                onUpdateState({ imageFit: fit.id as any });
+                              }
+                            }}
+                            className={`px-2 py-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                              isSelected
+                                ? "bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold"
+                                : "bg-slate-950 border-slate-855 hover:border-slate-700 text-slate-400"
+                            }`}
+                          >
+                            <span className="text-[10px] font-bold leading-tight">{fit.label}</span>
+                            <span className="text-[8px] opacity-70 leading-normal text-center">{fit.desc}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* IMAGE ENQUADRAMENTO (POSITION) ADJUSTMENT SLIDERS */}
               {(() => {

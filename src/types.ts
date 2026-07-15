@@ -29,6 +29,8 @@ export interface ClientProposalData {
   priceDecorations: number;
   priceTotal: number;
   themeId: string;
+  conceptTitle?: string;
+  conceptDescription?: string;
 }
 
 export interface PanelItem {
