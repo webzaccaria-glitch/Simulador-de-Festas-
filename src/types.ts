@@ -41,6 +41,8 @@ export interface PanelItem {
   customBackdropUrl: string | null;
   zIndex?: number;
   imageFit?: 'cover' | 'contain' | 'fill';
+  imagePositionX?: number;
+  imagePositionY?: number;
 }
 
 export interface CakeStandItem {

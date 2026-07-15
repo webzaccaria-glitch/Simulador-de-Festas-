@@ -3101,40 +3101,115 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
             </div>
 
             {/* Sublimation Image Fit adjustments */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
-              <div className="flex items-center gap-2 mb-3">
-                <Layers className="w-4.5 h-4.5 text-teal-400" />
-                <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
-                  Ajuste de Preenchimento da Imagem (Sublimação)
-                </h4>
-              </div>
-              <p className="text-slate-400 text-xs mb-4">
-                Como a estampa deve se ajustar ao formato físico da maquete. Ideal para alinhar proporções de costuras reais:
-              </p>
+            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl flex flex-col gap-4">
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Layers className="w-4.5 h-4.5 text-teal-400" />
+                  <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
+                    Ajuste de Preenchimento da Imagem (Sublimação)
+                  </h4>
+                </div>
+                <p className="text-slate-400 text-xs mb-4">
+                  Como a estampa deve se ajustar ao formato físico da maquete. Ideal para alinhar proporções de costuras reais:
+                </p>
 
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { id: "cover", label: "Cortar Bordas", desc: "Preenche mantendo proporção original" },
-                  { id: "contain", label: "Mostrar Inteira", desc: "Ajusta arte inteira dentro da forma" },
-                  { id: "fill", label: "Esticar", desc: "Distorce para cobrir tudo sem cortes" }
-                ].map((fit) => {
-                  const isSelected = (state.imageFit || "cover") === fit.id;
-                  return (
-                    <button
-                      key={fit.id}
-                      onClick={() => onUpdateState({ imageFit: fit.id as any })}
-                      className={`px-2 py-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
-                        isSelected
-                          ? "bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold"
-                          : "bg-slate-950 border-slate-855 hover:border-slate-700 text-slate-400"
-                      }`}
-                    >
-                      <span className="text-[10px] font-bold leading-tight">{fit.label}</span>
-                      <span className="text-[8px] opacity-70 leading-normal text-center">{fit.desc}</span>
-                    </button>
-                  );
-                })}
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: "cover", label: "Cortar Bordas", desc: "Preenche mantendo proporção original" },
+                    { id: "contain", label: "Mostrar Inteira", desc: "Ajusta arte inteira dentro da forma" },
+                    { id: "fill", label: "Esticar", desc: "Distorce para cobrir tudo sem cortes" }
+                  ].map((fit) => {
+                    const isSelected = (state.imageFit || "cover") === fit.id;
+                    return (
+                      <button
+                        key={fit.id}
+                        onClick={() => onUpdateState({ imageFit: fit.id as any })}
+                        className={`px-2 py-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-1 ${
+                          isSelected
+                            ? "bg-emerald-500/10 border-emerald-500 text-emerald-400 font-bold"
+                            : "bg-slate-950 border-slate-855 hover:border-slate-700 text-slate-400"
+                        }`}
+                      >
+                        <span className="text-[10px] font-bold leading-tight">{fit.label}</span>
+                        <span className="text-[8px] opacity-70 leading-normal text-center">{fit.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
+
+              {/* IMAGE ENQUADRAMENTO (POSITION) ADJUSTMENT SLIDERS */}
+              {(() => {
+                const currentPanels = getActivePanels(state);
+                const selectedPanel = currentPanels.find(p => p.id === state.selectedPanelId);
+                if (!selectedPanel) return null;
+
+                const posX = selectedPanel.imagePositionX ?? 50;
+                const posY = selectedPanel.imagePositionY ?? 50;
+
+                const handleUpdatePosition = (x: number, y: number) => {
+                  const updated = currentPanels.map(p => 
+                    p.id === selectedPanel.id 
+                      ? { ...p, imagePositionX: x, imagePositionY: y } 
+                      : p
+                  );
+                  onUpdateState({ panels: updated });
+                };
+
+                return (
+                  <div className="border-t border-slate-800 pt-4 flex flex-col gap-3 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                        <Sliders className="w-4 h-4 text-emerald-400" />
+                        <span>Enquadramento da Imagem</span>
+                      </span>
+                      <button 
+                        onClick={() => handleUpdatePosition(50, 50)}
+                        className="text-[10px] font-bold text-teal-400 hover:text-teal-300 transition-colors cursor-pointer"
+                      >
+                        Centralizar
+                      </button>
+                    </div>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      Mova os controles para reenquadrar o assunto principal da imagem no painel selecionado (disponível quando a estampa está no modo Cortar Bordas):
+                    </p>
+
+                    <div className="flex flex-col gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                      {/* Horizontal Position */}
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-[11px] text-slate-400">
+                          <span className="font-medium">Posição Horizontal</span>
+                          <span className="font-mono text-emerald-400 font-bold">{posX}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={posX}
+                          onChange={(e) => handleUpdatePosition(parseInt(e.target.value), posY)}
+                          className="w-full accent-emerald-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-ew-resize"
+                        />
+                      </div>
+
+                      {/* Vertical Position */}
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-[11px] text-slate-400">
+                          <span className="font-medium">Posição Vertical</span>
+                          <span className="font-mono text-emerald-400 font-bold">{posY}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0"
+                          max="100"
+                          value={posY}
+                          onChange={(e) => handleUpdatePosition(posX, parseInt(e.target.value))}
+                          className="w-full accent-emerald-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-ns-resize"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Depth Layering Organiser */}

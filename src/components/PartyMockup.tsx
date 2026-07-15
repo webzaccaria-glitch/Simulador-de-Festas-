@@ -2757,9 +2757,9 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     const key = `cyl${index}` as 'cyl0' | 'cyl1' | 'cyl2';
     const current = index === 0 ? cyl0Pos : index === 1 ? cyl1Pos : cyl2Pos;
 
-    // Boundary-aware position updates - increased limits to allow unlimited drag on floor/canvas
-    const nextX = Math.max(-150, Math.min(450, startCylX + dx));
-    const nextY = Math.max(-100, Math.min(400, startCylY - dy));
+    // Boundary-aware position updates - removed limits to allow unlimited drag on floor/canvas
+    const nextX = startCylX + dx;
+    const nextY = startCylY - dy;
 
     const updatedPos = {
       ...state.cylinderCustomPos,
@@ -4335,6 +4335,9 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
                 src={imgUrl}
                 alt="Main Panel Backdrop"
                 className={`w-full h-full pointer-events-none select-none ${objectFitClass}`}
+                style={{
+                  objectPosition: `${panel.imagePositionX ?? 50}% ${panel.imagePositionY ?? 50}%`
+                }}
                 referrerPolicy="no-referrer"
                 crossOrigin="anonymous"
               />
@@ -4359,6 +4362,9 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
               src={imgUrl}
               alt="Backdrop"
               className={`w-full h-full pointer-events-none select-none ${objectFitClass}`}
+              style={{
+                objectPosition: `${panel.imagePositionX ?? 50}% ${panel.imagePositionY ?? 50}%`
+              }}
               referrerPolicy="no-referrer"
               crossOrigin="anonymous"
             />
