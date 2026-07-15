@@ -376,59 +376,52 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
   ];
 
   return (
-    <div className="flex flex-col gap-5 h-full text-slate-300">
+    <div className="flex flex-col md:flex-row gap-5 h-full text-slate-300 pb-20 md:pb-0">
       
-      {/* STEPS/TABS HEADER */}
-      <div className="flex flex-col gap-2.5">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[10px] uppercase font-black text-emerald-400 tracking-wider flex items-center gap-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Configuração Guiada Passo a Passo
-          </span>
-          <span className="text-[10px] font-bold text-slate-500">
-            {activeStep === "panels" && "Etapa 1 de 5"}
-            {activeStep === "balloons" && "Etapa 2 de 5"}
-            {activeStep === "cylinders" && "Etapa 3 de 5"}
-            {activeStep === "decorations" && "Etapa 4 de 5"}
-            {activeStep === "settings" && "Etapa 5 de 5"}
-          </span>
-        </div>
-
-        {/* Dynamic Nav Tabs */}
-        <div className="grid grid-cols-5 gap-0.5 p-1 bg-slate-950 rounded-2xl border border-slate-900 shadow-inner">
-          {[
-            { id: "panels", label: "Painel", icon: ImageIcon, color: "text-blue-400", emoji: "🔴" },
-            { id: "balloons", label: "Balões", icon: Wand2, color: "text-rose-400", emoji: "🎈" },
-            { id: "cylinders", label: "Mesas", icon: Layers, color: "text-pink-400", emoji: "🪵" },
-            { id: "decorations", label: "Decor", icon: Sparkles, color: "text-amber-400", emoji: "✨" },
-            { id: "settings", label: "Geral", icon: Settings2, color: "text-teal-400", emoji: "🟢" }
-          ].map((step) => {
-            const isSelected = activeStep === step.id;
-            const IconComponent = step.icon;
-            return (
-              <button
-                key={step.id}
-                onClick={() => setActiveStep(step.id as any)}
-                className={`py-2 rounded-xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer relative ${
-                  isSelected 
-                    ? "bg-slate-900 border border-slate-800 text-slate-100 shadow-md scale-102" 
-                    : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/30"
-                }`}
-              >
-                <div className="flex items-center gap-0.5">
-                  <span className="text-xs sm:text-sm">{step.emoji}</span>
-                </div>
-                <span className="text-[9px] font-extrabold tracking-tight hidden sm:inline">{step.label}</span>
-                {isSelected && (
-                  <motion.div 
-                    layoutId="activeStepIndicator" 
-                    className="absolute -bottom-1 left-1/4 right-1/4 h-[3px] bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full" 
-                  />
-                )}
-              </button>
-            );
-          })}
-        </div>
+      {/* NAVIGATION BAR (RESPONSIVE: VERTICAL SIDEBAR ON MD+, FIXED BOTTOM BAR ON MOBILE) */}
+      <div 
+        id="main-navigation"
+        className="
+          fixed bottom-0 left-0 right-0 z-50 
+          bg-slate-950/95 backdrop-blur-md border-t border-slate-900/80 
+          px-4 py-2 flex flex-row justify-around items-center gap-1 shadow-2xl
+          md:static md:z-auto md:bg-transparent md:border-t-0 md:px-0 md:py-0 md:shadow-none
+          md:flex md:flex-col md:w-24 md:min-w-[6rem] md:shrink-0 md:border-r md:border-slate-800/40 md:pr-4 md:gap-4.5 md:pb-0 md:h-fit
+        "
+      >
+        {[
+          { id: "panels", label: "Painel", icon: ImageIcon },
+          { id: "balloons", label: "Balões", icon: Wand2 },
+          { id: "cylinders", label: "Mesas", icon: Layers },
+          { id: "decorations", label: "Decor", icon: Sparkles },
+          { id: "settings", label: "Geral", icon: Settings2 }
+        ].map((step) => {
+          const isSelected = activeStep === step.id;
+          const IconComponent = step.icon;
+          return (
+            <button
+              key={step.id}
+              onClick={() => setActiveStep(step.id as any)}
+              className={`
+                flex-1 md:flex-none md:w-[72px] md:h-[72px] py-2 md:py-0 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer relative group
+                ${isSelected 
+                  ? "bg-emerald-500 border border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/10 scale-105 font-black" 
+                  : "bg-slate-950/40 md:bg-transparent border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"
+                }
+              `}
+            >
+              <IconComponent className={`w-5.5 h-5.5 transition-colors ${isSelected ? "text-slate-950" : "text-slate-500 group-hover:text-slate-300"}`} />
+              <span className={`text-[10px] md:text-[11px] font-black tracking-tight ${isSelected ? "text-slate-950" : "text-slate-400 group-hover:text-slate-200"}`}>{step.label}</span>
+              
+              {isSelected && (
+                <motion.div 
+                  layoutId="activeStepIndicator" 
+                  className="absolute bottom-0 md:bottom-auto md:left-0 md:top-1/4 md:bottom-1/4 md:w-[3px] h-[3px] md:h-auto left-1/4 right-1/4 bg-emerald-300/40 rounded-full" 
+                />
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {/* STEP CONTENT SWITCHER */}
