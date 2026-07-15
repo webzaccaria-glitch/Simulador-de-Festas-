@@ -5,7 +5,7 @@
 
 import React, { useState, useRef } from "react";
 import { PartySetupState, ThemeConfig, ClientProposalData } from "../types";
-import { DollarSign, FileText, Calendar, User, Phone, Mail, MapPin, Printer, Share2, Plus, ArrowRight, CheckCircle, Smartphone, Sparkles } from "lucide-react";
+import { DollarSign, FileText, Calendar, CalendarPlus, User, Phone, Mail, MapPin, Printer, Share2, Plus, ArrowRight, CheckCircle, Smartphone, Sparkles } from "lucide-react";
 
 interface ClientProposalProps {
   state: PartySetupState;
@@ -57,14 +57,43 @@ export default function ClientProposal({ state, activeTheme, onUpdateState }: Cl
 
   const handleSave = () => {
     setIsSaved(true);
+    if (proposal.eventDate) {
+      window.open(getGoogleCalendarUrl(), "_blank");
+    }
     setTimeout(() => setIsSaved(false), 3000);
+  };
+
+  const getGoogleCalendarUrl = () => {
+    const title = encodeURIComponent(`Festa - ${proposal.clientName}`);
+    const location = encodeURIComponent(proposal.eventLocation || "");
+    const details = encodeURIComponent(
+      `Proposta de Decoracao FestDecor3D\n\nConceito Criativo: ${proposal.conceptTitle || ""}\nDescricao: ${proposal.conceptDescription || ""}\n\nObservacoes: ${proposal.notes || ""}`
+    );
+    
+    let dateStr = "";
+    if (proposal.eventDate) {
+      dateStr = proposal.eventDate.replace(/-/g, "");
+    }
+    
+    if (!dateStr) {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      dateStr = `${y}${m}${day}`;
+    }
+    
+    const start = `${dateStr}T140000`;
+    const end = `${dateStr}T180000`;
+    
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&location=${location}&details=${details}`;
   };
 
   // WhatsApp (Zap) share helper
   const handleWhatsAppShare = () => {
     const formattedDate = proposal.eventDate ? new Date(proposal.eventDate).toLocaleDateString("pt-BR") : "";
     
-    const message = `*FestaCRAFT Pro - Proposta de Decoração de Festa* 🌸
+    const message = `*FestDecor3D - Proposta de Decoração de Festa* 🌸
     
 Olá *${proposal.clientName}*! Aqui está o layout virtual e a proposta de orçamento para a sua festa:
 
@@ -86,7 +115,7 @@ ${proposal.conceptDescription ? `*Descrição:* ${proposal.conceptDescription}\n
 ----------------------------------
 *TOTAL DO PROJETO:* R$ ${proposal.priceTotal.toFixed(2)}
 
-*Visualização Virtual:* Você pode ver nossa simulação 3D abrindo o FestaCRAFT Pro no seu navegador!
+*Visualização Virtual:* Você pode ver nossa simulação 3D abrindo o FestDecor3D no seu navegador!
 
 Ficamos à disposição para fechamento de contrato!`;
 
@@ -139,12 +168,19 @@ Ficamos à disposição para fechamento de contrato!`;
           <div className="flex flex-col gap-1">
             <label className="text-[10px] uppercase font-bold text-slate-500">Data do Evento:</label>
             <div className="relative">
-              <Calendar className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500" />
+              <Calendar className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-500 pointer-events-none" />
               <input
                 type="date"
                 value={proposal.eventDate}
                 onChange={(e) => handleTextChange("eventDate", e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
+                onClick={(e) => {
+                  try {
+                    e.currentTarget.showPicker();
+                  } catch (err) {
+                    console.log("showPicker not supported", err);
+                  }
+                }}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 cursor-pointer"
               />
             </div>
           </div>
@@ -331,7 +367,7 @@ Ficamos à disposição para fechamento de contrato!`;
             <div>
               <div className="flex items-center gap-1.5">
                 <div className="w-3.5 h-3.5 rounded-full bg-emerald-600" />
-                <span className="text-sm font-black tracking-tight text-slate-900 uppercase">FestaCRAFT Premium</span>
+                <span className="text-sm font-black tracking-tight text-slate-900 uppercase">FestDecor3D Premium</span>
               </div>
               <p className="text-[10px] text-slate-500 mt-1">Simulação de Decoração & Projeto Personalizado</p>
             </div>
@@ -351,9 +387,9 @@ Ficamos à disposição para fechamento de contrato!`;
             </div>
             <div>
               <span className="text-slate-400 font-extrabold block uppercase tracking-wider text-[8px] mb-1">Detalhes do Evento</span>
-              <p className="font-bold text-slate-900 flex items-center gap-1">
+              <p className="font-bold text-slate-900 flex items-center gap-1 flex-wrap">
                 <Calendar className="w-3 h-3 text-slate-500" />
-                <span>{new Date(proposal.eventDate).toLocaleDateString()}</span>
+                <span>{proposal.eventDate ? new Date(proposal.eventDate + "T00:00:00").toLocaleDateString("pt-BR") : ""}</span>
               </p>
               <p className="text-slate-600 mt-0.5 max-w-[200px] truncate">{proposal.eventLocation}</p>
               <p className="text-slate-500 italic mt-1 line-clamp-1">"{proposal.notes}"</p>
@@ -447,7 +483,7 @@ Ficamos à disposição para fechamento de contrato!`;
           {/* Footer signature */}
           <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center text-[9px] text-slate-400">
             <span>Aprovado por: ____________________________________</span>
-            <span>Apresentado por: FestaCRAFT Pro</span>
+            <span>Apresentado por: FestDecor3D</span>
           </div>
         </div>
       </div>
@@ -458,7 +494,12 @@ Ficamos à disposição para fechamento de contrato!`;
           <div className="max-w-4xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 relative flex flex-col gap-6">
             
             <button 
-              onClick={() => setShowPresentationMode(false)}
+              onClick={() => {
+                setShowPresentationMode(false);
+                if (proposal.eventDate) {
+                  window.open(getGoogleCalendarUrl(), "_blank");
+                }
+              }}
               className="absolute top-5 right-5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
             >
               ✕
@@ -535,28 +576,33 @@ Ficamos à disposição para fechamento de contrato!`;
                   </div>
                 </div>
 
-                <div className="bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/15 flex justify-between items-center">
+                <div className="bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/15 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
                   <div>
                     <span className="text-[10px] text-slate-500 uppercase font-extrabold tracking-wider block">Orçamento Total Concluído</span>
                     <span className="text-xl font-bold text-emerald-400">R$ {proposal.priceTotal.toFixed(2)}</span>
                   </div>
-                  <button 
-                    onClick={() => {
-                      setShowPresentationMode(false);
-                      handlePrint();
-                    }}
-                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>Confirmar Locação</span>
-                  </button>
+                  <div className="flex gap-2 w-full sm:w-auto">
+                    <button 
+                      onClick={() => {
+                        setShowPresentationMode(false);
+                        if (proposal.eventDate) {
+                          window.open(getGoogleCalendarUrl(), "_blank");
+                        }
+                        handlePrint();
+                      }}
+                      className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span>Confirmar Locação</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Quick tips about premium fabrics */}
             <p className="text-slate-500 text-[9px] text-center mt-2">
-              *Painéis e cilindros sublimados FestaCRAFT utilizam tecidos elásticos de microfibra, laváveis, anti-reflexo de flash e com tintas atóxicas ecológicas.
+              *Painéis e cilindros sublimados FestDecor3D utilizam tecidos elásticos de microfibra, laváveis, anti-reflexo de flash e com tintas atóxicas ecológicas.
             </p>
           </div>
         </div>
