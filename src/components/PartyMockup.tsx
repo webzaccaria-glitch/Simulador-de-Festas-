@@ -6,7 +6,7 @@
 import React from "react";
 import { PartySetupState, ThemeConfig, PanelItem, BalloonItem, CakeStandItem } from "../types";
 import { motion } from "motion/react";
-import { Info, Sparkles, Move, ZoomIn, ZoomOut, Grid, RotateCw, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Hand, Camera, Download, Share2, Send, Check, Loader2, X, SeparatorVertical } from "lucide-react";
+import { Info, Sparkles, Move, ZoomIn, ZoomOut, Grid, RotateCw, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Hand, Camera, Download, Share2, Send, Check, Loader2, X, SeparatorVertical, Lock, Unlock } from "lucide-react";
 import html2canvas from "html2canvas";
 import { getActivePanels, getPanelImage, getActiveBalloons } from "../utils";
 
@@ -392,6 +392,9 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
   const [panX, setPanX] = React.useState<number>(0);
   const [panY, setPanY] = React.useState<number>(0);
 
+  const [cameraLocked, setCameraLocked] = React.useState<boolean>(false);
+  const cameraLockedRef = React.useRef(cameraLocked);
+
   const zoomRef = React.useRef(zoom);
   const panXRef = React.useRef(panX);
   const panYRef = React.useRef(panY);
@@ -400,7 +403,8 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     zoomRef.current = zoom;
     panXRef.current = panX;
     panYRef.current = panY;
-  }, [zoom, panX, panY]);
+    cameraLockedRef.current = cameraLocked;
+  }, [zoom, panX, panY, cameraLocked]);
 
   const [activePan, setActivePan] = React.useState<{
     startX: number;
@@ -670,6 +674,8 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     // Ignore touch pointer types as we handle touch gestures natively
     if (e.pointerType === "touch") return;
 
+    if (cameraLocked) return;
+
     // Only pan if we aren't dragging an interactive item, resize-handle, button or delete btn
     if (
       (e.target as HTMLElement).closest(".interactive-item") ||
@@ -712,6 +718,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     if (!stage) return;
 
     const handleNativeWheel = (e: WheelEvent) => {
+      if (cameraLockedRef.current) return;
       e.preventDefault();
       const zoomIntensity = 0.08;
       setZoom((prevZoom) => {
@@ -735,7 +742,13 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     let lastTouchDistance = 0;
     let isPinching = false;
 
+    let hasPanStarted = false;
+    let hasPinchStarted = false;
+    let initialPinchDistance = 0;
+
     const handleTouchStart = (e: TouchEvent) => {
+      if (cameraLockedRef.current) return;
+
       // Ignore touch starts inside interactive elements (cylinders, balloons, stands, etc.)
       if (
         (e.target as HTMLElement).closest(".interactive-item") ||
@@ -753,14 +766,19 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
         touchStartY = e.touches[0].clientY;
         touchStartPanX = panXRef.current;
         touchStartPanY = panYRef.current;
+        hasPanStarted = false;
       } else if (e.touches.length === 2) {
         isTouchPanning = false;
         isPinching = true;
-        lastTouchDistance = getDistance(e.touches[0], e.touches[1]);
+        initialPinchDistance = getDistance(e.touches[0], e.touches[1]);
+        lastTouchDistance = initialPinchDistance;
+        hasPinchStarted = false;
       }
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (cameraLockedRef.current) return;
+
       if (isTouchPanning || isPinching) {
         e.preventDefault();
       }
@@ -768,26 +786,51 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       if (isTouchPanning && e.touches.length === 1) {
         const dx = e.touches[0].clientX - touchStartX;
         const dy = e.touches[0].clientY - touchStartY;
-        setPanX(touchStartPanX + dx);
-        setPanY(touchStartPanY + dy);
+        
+        if (!hasPanStarted) {
+          const moveDist = Math.sqrt(dx * dx + dy * dy);
+          if (moveDist > 12) {
+            hasPanStarted = true;
+          }
+        }
+
+        if (hasPanStarted) {
+          setPanX(touchStartPanX + dx);
+          setPanY(touchStartPanY + dy);
+        }
       } else if (isPinching && e.touches.length === 2) {
         const dist = getDistance(e.touches[0], e.touches[1]);
-        if (lastTouchDistance > 0) {
-          const factor = dist / lastTouchDistance;
-          setZoom((prevZoom) => {
-            const newZoom = prevZoom * factor;
-            return Math.min(Math.max(newZoom, 0.4), 3.0);
-          });
+        
+        if (!hasPinchStarted) {
+          const pinchChange = Math.abs(dist - initialPinchDistance);
+          if (pinchChange > 15) {
+            hasPinchStarted = true;
+            lastTouchDistance = dist;
+          }
         }
-        lastTouchDistance = dist;
+
+        if (hasPinchStarted) {
+          if (lastTouchDistance > 0) {
+            const factor = dist / lastTouchDistance;
+            setZoom((prevZoom) => {
+              const newZoom = prevZoom * factor;
+              return Math.min(Math.max(newZoom, 0.4), 3.0);
+            });
+          }
+          lastTouchDistance = dist;
+        }
       }
     };
 
     const handleTouchEnd = (e: TouchEvent) => {
+      if (cameraLockedRef.current) return;
+
       if (e.touches.length === 0) {
         isTouchPanning = false;
         isPinching = false;
         lastTouchDistance = 0;
+        hasPanStarted = false;
+        hasPinchStarted = false;
       } else if (e.touches.length === 1) {
         // Smoothly transition back to panning with the remaining single touch
         isPinching = false;
@@ -797,6 +840,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
         touchStartPanX = panXRef.current;
         touchStartPanY = panYRef.current;
         lastTouchDistance = 0;
+        hasPanStarted = false;
       }
     };
 
@@ -4475,11 +4519,32 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     <div className="flex flex-col h-full bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden relative group">
       {/* Visual Header / Controls */}
       <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-slate-800 bg-slate-950/60 flex flex-col gap-2 sm:flex-row sm:items-center justify-between z-10">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <h3 className="font-sans font-semibold text-slate-200 text-xs sm:text-sm tracking-tight truncate">
+          <h3 className="font-sans font-semibold text-slate-200 text-xs sm:text-sm tracking-tight truncate mr-1">
             Maquete Interativa 3D de Decoração
           </h3>
+          <button
+            onClick={() => setCameraLocked(!cameraLocked)}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border shrink-0 cursor-pointer ${
+              cameraLocked
+                ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
+                : "bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700"
+            }`}
+            title={cameraLocked ? "Movimento da maquete bloqueado" : "Movimento da maquete livre"}
+          >
+            {cameraLocked ? (
+              <>
+                <Lock className="w-3 h-3 text-amber-400" />
+                <span>Zoom Bloqueado</span>
+              </>
+            ) : (
+              <>
+                <Unlock className="w-3 h-3 text-slate-400" />
+                <span>Zoom Livre</span>
+              </>
+            )}
+          </button>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {(state.cylinderCustomPos || state.panels) && (
@@ -4665,15 +4730,6 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
 
         {/* Floating Controls Overlay (Camera, Pan, Zoom) */}
         
-        {/* Instruction badge for touch-based panning */}
-        <div className="absolute top-4 left-4 z-30 flex flex-col gap-1.5 pointer-events-none" data-html2canvas-ignore="true">
-          <div className="bg-slate-950/85 border border-slate-800 px-2.5 py-1.5 rounded-lg backdrop-blur-md flex items-center gap-1.5 shadow-xl">
-            <Hand className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-            <span className="text-[10px] text-slate-300 font-semibold leading-none">
-              Dica: Arraste o fundo para mover a maquete
-            </span>
-          </div>
-        </div>
 
 
       </div>
