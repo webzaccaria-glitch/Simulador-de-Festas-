@@ -4336,7 +4336,9 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
                 alt="Main Panel Backdrop"
                 className={`w-full h-full pointer-events-none select-none ${objectFitClass}`}
                 style={{
-                  objectPosition: `${panel.imagePositionX ?? 50}% ${panel.imagePositionY ?? 50}%`
+                  objectPosition: `${panel.imagePositionX ?? 50}% ${panel.imagePositionY ?? 50}%`,
+                  transform: `scale(${panel.imageScale ? panel.imageScale / 100 : 1})`,
+                  transformOrigin: "center"
                 }}
                 referrerPolicy="no-referrer"
                 crossOrigin="anonymous"
@@ -4363,7 +4365,9 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
               alt="Backdrop"
               className={`w-full h-full pointer-events-none select-none ${objectFitClass}`}
               style={{
-                objectPosition: `${panel.imagePositionX ?? 50}% ${panel.imagePositionY ?? 50}%`
+                objectPosition: `${panel.imagePositionX ?? 50}% ${panel.imagePositionY ?? 50}%`,
+                transform: `scale(${panel.imageScale ? panel.imageScale / 100 : 1})`,
+                transformOrigin: "center"
               }}
               referrerPolicy="no-referrer"
               crossOrigin="anonymous"

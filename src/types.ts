@@ -43,6 +43,7 @@ export interface PanelItem {
   imageFit?: 'cover' | 'contain' | 'fill';
   imagePositionX?: number;
   imagePositionY?: number;
+  imageScale?: number;
 }
 
 export interface CakeStandItem {

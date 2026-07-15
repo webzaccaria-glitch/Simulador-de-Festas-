@@ -3146,11 +3146,12 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
 
                 const posX = selectedPanel.imagePositionX ?? 50;
                 const posY = selectedPanel.imagePositionY ?? 50;
+                const scale = selectedPanel.imageScale ?? 100;
 
-                const handleUpdatePosition = (x: number, y: number) => {
+                const handleUpdatePosition = (x: number, y: number, s: number) => {
                   const updated = currentPanels.map(p => 
                     p.id === selectedPanel.id 
-                      ? { ...p, imagePositionX: x, imagePositionY: y } 
+                      ? { ...p, imagePositionX: x, imagePositionY: y, imageScale: s } 
                       : p
                   );
                   onUpdateState({ panels: updated });
@@ -3164,17 +3165,34 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         <span>Enquadramento da Imagem</span>
                       </span>
                       <button 
-                        onClick={() => handleUpdatePosition(50, 50)}
+                        onClick={() => handleUpdatePosition(50, 50, 100)}
                         className="text-[10px] font-bold text-teal-400 hover:text-teal-300 transition-colors cursor-pointer"
                       >
-                        Centralizar
+                        Resetar Enquadramento
                       </button>
                     </div>
                     <p className="text-slate-400 text-[11px] leading-relaxed">
-                      Mova os controles para reenquadrar o assunto principal da imagem no painel selecionado (disponível quando a estampa está no modo Cortar Bordas):
+                      Para imagens que ficam cortadas ou fora de centro, aumente o <b>Zoom</b> para criar margem de manobra e depois ajuste a <b>Posição Horizontal / Vertical</b> para reenquadrar o assunto principal da estampa:
                     </p>
 
-                    <div className="flex flex-col gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                    <div className="flex flex-col gap-4 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800">
+                      {/* Image Zoom / Scale */}
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-[11px] text-slate-400">
+                          <span className="font-medium">Zoom (Escala da Imagem)</span>
+                          <span className="font-mono text-emerald-400 font-bold">{scale}%</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="100"
+                          max="300"
+                          step="5"
+                          value={scale}
+                          onChange={(e) => handleUpdatePosition(posX, posY, parseInt(e.target.value))}
+                          className="w-full accent-emerald-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-ew-resize"
+                        />
+                      </div>
+
                       {/* Horizontal Position */}
                       <div className="flex flex-col gap-1">
                         <div className="flex justify-between text-[11px] text-slate-400">
@@ -3186,7 +3204,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                           min="0"
                           max="100"
                           value={posX}
-                          onChange={(e) => handleUpdatePosition(parseInt(e.target.value), posY)}
+                          onChange={(e) => handleUpdatePosition(parseInt(e.target.value), posY, scale)}
                           className="w-full accent-emerald-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-ew-resize"
                         />
                       </div>
@@ -3202,7 +3220,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                           min="0"
                           max="100"
                           value={posY}
-                          onChange={(e) => handleUpdatePosition(posX, parseInt(e.target.value))}
+                          onChange={(e) => handleUpdatePosition(posX, parseInt(e.target.value), scale)}
                           className="w-full accent-emerald-500 h-1 bg-slate-800 rounded-lg appearance-none cursor-ns-resize"
                         />
                       </div>
