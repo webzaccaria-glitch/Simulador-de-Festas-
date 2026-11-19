@@ -2690,7 +2690,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       };
     }
     if (state.floorType === "image") {
-      const imgUrl = getProxiedUrl(state.floorImageUrl || "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=500&q=80");
+      const imgUrl = getProxiedUrl(state.floorImageUrl || "/backdrops/piso-padrao.svg");
       return {
         backgroundImage: `url('${imgUrl}')`,
         backgroundSize: "cover",
@@ -4747,7 +4747,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
           >
             {state.floorType === "image" && (
               <img
-                src={getProxiedUrl(state.floorImageUrl || "https://images.unsplash.com/photo-1557683316-973673baf926?auto=format&fit=crop&w=500&q=80")}
+                src={getProxiedUrl(state.floorImageUrl || "/backdrops/piso-padrao.svg")}
                 alt="Floor Image"
                 className="w-full h-full object-cover pointer-events-none"
                 crossOrigin="anonymous"

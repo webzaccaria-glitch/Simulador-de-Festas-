@@ -45,6 +45,7 @@ async function waitSaved(page) {
   try {
     const ctx = await browser.newContext({ ...devices["Pixel 7"], acceptDownloads: true });
     const page = await ctx.newPage();
+    globalThis.__page = page;
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
 
@@ -122,6 +123,28 @@ async function waitSaved(page) {
     assert.equal(await page.getByLabel("Preço de Portal 95×220 cm").inputValue(), "150");
     step("projeto e orçamento reabertos após recarregar");
 
+    // Upload próprio aplicado ao painel selecionado (imagem magenta gerada no navegador)
+    await page.getByRole("button", { name: /1\. Montar/ }).click();
+    // Tocar na aba ativa recolhe as ferramentas; "Mostrar ferramentas" reabre.
+    await page.getByRole("button", { name: "Painel", exact: true }).first().click();
+    if (await page.getByRole("button", { name: /Mostrar ferramentas/ }).isVisible()) {
+      await page.getByRole("button", { name: /Mostrar ferramentas/ }).click();
+    } else {
+      await page.getByRole("button", { name: "Painel", exact: true }).first().click();
+      await page.getByRole("button", { name: /Mostrar ferramentas/ }).click();
+    }
+    await page.getByRole("button", { name: /Enviar minha imagem/ }).waitFor();
+    const pngB64 = await page.evaluate(() => {
+      const c = document.createElement("canvas"); c.width = c.height = 256;
+      const g = c.getContext("2d"); g.fillStyle = "#FF00FF"; g.fillRect(0, 0, 256, 256);
+      return c.toDataURL("image/png").split(",")[1];
+    });
+    await page.locator('input[type="file"]').setInputFiles({ name: "minha-estampa.png", mimeType: "image/png", buffer: Buffer.from(pngB64, "base64") });
+    await page.getByRole("button", { name: /Confirmar e Aplicar/ }).click();
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-testid="stage"] img')].some((i) => i.src.includes("/api/assets/") && i.complete && i.naturalWidth > 0), null, { timeout: 15000 });
+    await waitSaved(page);
+    step("imagem enviada aplicada ao painel e salva");
+
     // Compartilhar: exportar JPG
     await page.getByRole("button", { name: /3\. Compartilhar/ }).click();
     await page.screenshot({ path: path.join(SHOTS, "3-compartilhar.png") });
@@ -134,7 +157,25 @@ async function waitSaved(page) {
     const head = fs.readFileSync(file).subarray(0, 3);
     assert.ok(head[0] === 0xff && head[1] === 0xd8, "arquivo é JPEG");
     assert.ok(fs.statSync(file).size > 10000, "JPEG com conteúdo");
-    step(`JPG exportado (${fs.statSync(file).size} bytes)`);
+    // O JPG precisa conter a imagem enviada (magenta) e o backdrop local do tema (vermelho #E63946 nas mesas).
+    const counts = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = "data:image/jpeg;base64," + b64;
+      await img.decode();
+      const c = document.createElement("canvas"); c.width = img.width; c.height = img.height;
+      const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+      const d = g.getImageData(0, 0, c.width, c.height).data;
+      let magenta = 0, themeRed = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const [r, gg, bb] = [d[i], d[i + 1], d[i + 2]];
+        if (r > 200 && gg < 70 && bb > 200) magenta++;
+        if (Math.abs(r - 230) < 30 && Math.abs(gg - 57) < 30 && Math.abs(bb - 70) < 30) themeRed++;
+      }
+      return { magenta, themeRed, w: c.width, h: c.height };
+    }, fs.readFileSync(file).toString("base64"));
+    assert.ok(counts.magenta > 2000, `JPG contém a imagem enviada (pixels magenta: ${counts.magenta})`);
+    assert.ok(counts.themeRed > 500, `JPG contém o backdrop local do tema (pixels: ${counts.themeRed})`);
+    step(`JPG exportado (${fs.statSync(file).size} bytes, ${counts.w}×${counts.h}) com upload (${counts.magenta} px) e backdrop local (${counts.themeRed} px)`);
 
     // Lista, duplicar e lixeira pela interface
     await page.getByRole("button", { name: "Voltar aos projetos" }).click();
@@ -170,13 +211,17 @@ async function waitSaved(page) {
 
     assert.deepEqual(errors, [], "sem erros de JavaScript na página");
     console.log("\nE2E OK — screenshots em", SHOTS);
+  } catch (e) {
+    try { await globalThis.__page?.screenshot({ path: path.join(SHOTS, "falha.png") }); } catch {}
+    throw e;
   } finally {
     await browser.close();
     server.kill("SIGTERM");
     fs.rmSync(DATA_DIR, { recursive: true, force: true });
   }
-})().catch((e) => {
+})().catch(async (e) => {
   console.error("E2E FALHOU:", e);
+  try { await globalThis.__page?.screenshot({ path: path.join(SHOTS, "falha.png") }); console.error("screenshot da falha:", path.join(SHOTS, "falha.png")); } catch {}
   server.kill("SIGTERM");
   process.exit(1);
 });

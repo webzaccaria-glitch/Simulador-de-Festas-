@@ -18,6 +18,7 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium   # usa a versão declarada em devDependencies
       - run: node tests/e2e.mjs e2e-shots
+      - run: node tests/visual-check.mjs e2e-shots
       - uses: actions/upload-artifact@v4
         if: always()
         with:

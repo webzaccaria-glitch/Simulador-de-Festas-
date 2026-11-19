@@ -313,15 +313,15 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
         textColor: data.textColor || "#FFFFFF"
       };
 
-      if (newTheme.keyword.includes("roblox")) {
-        newTheme.backdropUrl = "https://images.unsplash.com/photo-1612287230202-1bf1d85d1bdf?auto=format&fit=crop&w=800&q=80";
-      } else if (newTheme.keyword.includes("minecraft")) {
-        newTheme.backdropUrl = "https://images.unsplash.com/photo-1605899435973-ca2d1a8861cf?auto=format&fit=crop&w=800&q=80";
-      } else if (newTheme.keyword.includes("car") || newTheme.keyword.includes("roda") || newTheme.keyword.includes("wheels")) {
-        newTheme.backdropUrl = "https://images.unsplash.com/photo-1511919884226-fd3cad34687c?auto=format&fit=crop&w=800&q=80";
-      } else {
-        newTheme.backdropUrl = "https://images.unsplash.com/photo-1513151233558-d860c5398176?auto=format&fit=crop&w=800&q=80";
-      }
+      // Backdrops locais (não dependem de bancos de imagem externos no primeiro uso).
+      const kw = newTheme.keyword;
+      newTheme.backdropUrl =
+        kw.includes("roblox") || kw.includes("minecraft") || kw.includes("game") ? "/backdrops/roblox.svg" :
+        kw.includes("astro") || kw.includes("espa") || kw.includes("space") ? "/backdrops/astronauta.svg" :
+        kw.includes("safari") || kw.includes("selva") || kw.includes("jungle") ? "/backdrops/safari.svg" :
+        kw.includes("princes") || kw.includes("realeza") || kw.includes("flor") ? "/backdrops/princess.svg" :
+        kw.includes("futebol") || kw.includes("soccer") || kw.includes("bola") ? "/backdrops/futebol.svg" :
+        "/backdrops/fallback.svg";
 
       onSelectTheme(newTheme);
       setImagePrompt(`Estampa redonda profissional e fofa com padrão sem costura de ${newTheme.name}, aquarela infantil macia, fundo limpo, sem textos`);
@@ -406,7 +406,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
   ];
 
   return (
-    <div className="flex flex-col md:flex-row gap-5 h-full text-slate-300 pb-20 md:pb-0">
+    <div className="flex flex-col md:flex-row gap-5 h-full min-w-0 text-slate-300 pb-20 md:pb-0">
       
       {/* NAVIGATION BAR (RESPONSIVE: VERTICAL SIDEBAR ON MD+, FIXED BOTTOM BAR ON MOBILE) */}
       <div 
@@ -466,7 +466,16 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
       </div>
 
       {/* STEP CONTENT SWITCHER */}
-      <div className={`flex-1 min-h-0 space-y-5 ${toolsCollapsed ? "hidden md:block" : ""}`}>
+      {toolsCollapsed && (
+        <button
+          type="button"
+          onClick={() => setToolsCollapsed(false)}
+          className="md:hidden w-full min-h-[52px] rounded-2xl border border-slate-700 bg-slate-900 text-slate-100 font-bold flex items-center justify-center gap-2"
+        >
+          <ChevronDown className="w-5 h-5 rotate-180" /> Mostrar ferramentas
+        </button>
+      )}
+      <div className={`flex-1 min-w-0 min-h-0 space-y-5 ${toolsCollapsed ? "hidden md:block" : ""}`}>
         {(errorMessage || infoMessage) && (
           <div role="status" className={`text-xs p-3 rounded-xl border flex items-start justify-between gap-2 ${errorMessage ? "text-red-300 bg-red-950/30 border-red-500/30" : "text-amber-200 bg-amber-950/30 border-amber-500/30"}`}>
             <span>{errorMessage || infoMessage}</span>
@@ -484,7 +493,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                 <h4 className="font-sans font-bold text-slate-100 text-sm uppercase flex items-center gap-2 mb-2">
                   <Palette className="w-4 h-4 text-emerald-400" /> Tema da festa
                 </h4>
-                <div className="flex gap-2 overflow-x-auto pb-1">
+                <div className="flex flex-wrap gap-2">
                   {PRESET_THEMES.map((t) => (
                     <button
                       key={t.id}
@@ -492,7 +501,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         onSelectTheme(t);
                         setInfoMessage(null);
                       }}
-                      className={`shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-bold border flex items-center gap-2 ${activeTheme.id === t.id ? "bg-emerald-500 text-slate-950 border-emerald-400" : "bg-slate-950 border-slate-800 text-slate-300"}`}
+                      className={`min-h-[44px] max-w-full px-3 rounded-xl text-xs font-bold border flex items-center gap-2 text-left ${activeTheme.id === t.id ? "bg-emerald-500 text-slate-950 border-emerald-400" : "bg-slate-950 border-slate-800 text-slate-300"}`}
                     >
                       <span className="flex -space-x-1">
                         {t.balloonColors.slice(0, 3).map((c, i) => (
@@ -510,9 +519,9 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   value={themeSearch}
                   onChange={(e) => setThemeSearch(e.target.value)}
                   placeholder="Outro tema (ex.: Fazendinha)"
-                  className="flex-1 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+                  className="flex-1 min-w-0 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
                 />
-                <button type="submit" disabled={isSearching || !themeSearch.trim()} className="min-h-[44px] px-3 rounded-xl bg-slate-800 text-slate-100 text-xs font-bold disabled:opacity-40 flex items-center gap-1">
+                <button type="submit" disabled={isSearching || !themeSearch.trim()} className="shrink-0 min-h-[44px] px-3 rounded-xl bg-slate-800 text-slate-100 text-xs font-bold disabled:opacity-40 flex items-center gap-1">
                   <Sparkles className="w-4 h-4 text-amber-300" /> {isSearching ? "..." : "Sugerir"}
                 </button>
               </form>
@@ -522,9 +531,9 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   value={imagePrompt}
                   onChange={(e) => setImagePrompt(e.target.value)}
                   placeholder="Descreva uma estampa para gerar com IA"
-                  className="flex-1 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+                  className="flex-1 min-w-0 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
                 />
-                <button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="min-h-[44px] px-3 rounded-xl bg-slate-800 text-slate-100 text-xs font-bold disabled:opacity-40 flex items-center gap-1">
+                <button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="shrink-0 min-h-[44px] px-3 rounded-xl bg-slate-800 text-slate-100 text-xs font-bold disabled:opacity-40 flex items-center gap-1">
                   <Wand2 className="w-4 h-4 text-emerald-300" /> {isGeneratingImage ? "Gerando..." : "Gerar"}
                 </button>
               </div>

@@ -367,14 +367,14 @@ export default function Editor({ project, aiConfigured, onBack }: Props) {
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
         {/* Palco: sempre montado (preserva zoom/câmera e permite exportar). No celular fica fixo no topo. */}
-        <section className={`lg:col-span-7 order-1 lg:order-2 lg:sticky lg:top-32 ${tab === "design" ? "sticky top-[108px] z-30 bg-slate-950 pb-2" : "hidden"}`}>
+        <section className={`lg:col-span-7 min-w-0 order-1 lg:order-2 lg:sticky lg:top-32 ${tab === "design" ? "sticky top-[108px] z-30 bg-slate-950 pb-2" : "hidden"}`}>
           <div className="h-[42vh] min-h-[260px] sm:h-[420px] lg:h-[500px]" data-testid="stage">
             <PartyMockup state={state} activeTheme={activeTheme} onUpdateState={handleUpdateState} />
           </div>
         </section>
 
         {tab === "design" && (
-          <section className="lg:col-span-5 flex flex-col gap-6 order-2 lg:order-1">
+          <section data-testid="tools-column" className="lg:col-span-5 min-w-0 flex flex-col gap-6 order-2 lg:order-1">
             <ImageSearch state={state} activeTheme={activeTheme} onUpdateState={handleUpdateState} onSelectTheme={handleSelectTheme} />
           </section>
         )}

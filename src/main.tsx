@@ -18,3 +18,17 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   });
 }
+
+// Imagem quebrada (ex.: banco de imagens externo fora do ar) vira estampa local estável,
+// em vez de mostrar o texto alternativo. Vale para palco, miniaturas e exportação.
+const IMAGE_FALLBACK = '/backdrops/fallback.svg';
+document.addEventListener(
+  'error',
+  (e) => {
+    const el = e.target as HTMLImageElement | null;
+    if (!el || el.tagName !== 'IMG' || el.dataset.fdFallback === '1') return;
+    el.dataset.fdFallback = '1';
+    el.src = IMAGE_FALLBACK;
+  },
+  true,
+);

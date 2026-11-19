@@ -14,7 +14,9 @@
     "test:e2e": "node tests/e2e.mjs",
     "icons": "node scripts/make-icons.cjs",
     "cap:sync": "npm run build && cap sync android",
-    "android:apk": "npm run cap:sync && cd android && ./gradlew assembleDebug"
+    "android:apk": "npm run cap:sync && cd android && ./gradlew assembleDebug",
+    "test:visual": "node tests/visual-check.mjs",
+    "backdrops": "node scripts/make-backdrops.cjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.6.2",

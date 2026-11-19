@@ -11,7 +11,7 @@ export const PRESET_THEMES: ThemeConfig[] = [
     name: "Roblox Aventuras Virtuais",
     keyword: "roblox",
     description: "Mergulhe no universo dos blocos e avatares favoritos dos pequenos! Uma paleta eletrizante e cheia de ação gamer para celebrar em grande estilo.",
-    backdropUrl: "https://images.unsplash.com/photo-1612287230202-1bf1d85d1bdf?auto=format&fit=crop&w=800&q=80", // colorful game bricks/neon look
+    backdropUrl: "/backdrops/roblox.svg", // local (antes: https://images.unsplash.com/photo-1612287230202-1bf1d85d1bdf) // colorful game bricks/neon look
     balloonColors: ["#E63946", "#1D3557", "#F1FAEE", "#A8DADC"],
     cylinderColors: ["#E63946", "#1D3557", "#457B9D"],
     decorations: [
@@ -28,7 +28,7 @@ export const PRESET_THEMES: ThemeConfig[] = [
     name: "Astronauta & Espaço Sideral",
     keyword: "space astronaut",
     description: "Uma incrível jornada rumo às galáxias distantes, planetas e nebulosas reluzentes. Perfeito para pequenos astronautas exploradores!",
-    backdropUrl: "https://images.unsplash.com/photo-1506318137071-a8e063b4bec0?auto=format&fit=crop&w=800&q=80", // beautiful deep starry sky
+    backdropUrl: "/backdrops/astronauta.svg", // local (antes: https://images.unsplash.com/photo-1506318137071-a8e063b4bec0) // beautiful deep starry sky
     balloonColors: ["#0B3C5D", "#328CC1", "#D9B310", "#FFFFFF"],
     cylinderColors: ["#0B3C5D", "#328CC1", "#D9B310"],
     decorations: [
@@ -45,7 +45,7 @@ export const PRESET_THEMES: ThemeConfig[] = [
     name: "Safari Aquarelado",
     keyword: "safari jungle water color",
     description: "A fofura dos animais selvagens retratada com a leveza e a elegância da aquarela. Girafas, leões e elefantes em uma harmonia perfeita.",
-    backdropUrl: "https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?auto=format&fit=crop&w=800&q=80", // savanna pattern or soft texture
+    backdropUrl: "/backdrops/safari.svg", // local (antes: https://images.unsplash.com/photo-1547471080-7cc2caa01a7e) // savanna pattern or soft texture
     balloonColors: ["#52796F", "#84A98C", "#F4A261", "#E9C46A"],
     cylinderColors: ["#52796F", "#84A98C", "#CAD2C5"],
     decorations: [
@@ -62,7 +62,7 @@ export const PRESET_THEMES: ThemeConfig[] = [
     name: "Realeza das Princesas",
     keyword: "princess watercolor castle",
     description: "Um verdadeiro conto de fadas! Rosa delicado, brilhos reais e castelos que tornam este dia inesquecível e digno de uma princesa.",
-    backdropUrl: "https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=800&q=80", // pink watercolor flowers
+    backdropUrl: "/backdrops/princess.svg", // local (antes: https://images.unsplash.com/photo-1518199266791-5375a83190b7) // pink watercolor flowers
     balloonColors: ["#FFC8DD", "#FFACCE", "#BDE0FE", "#FFF0F5"],
     cylinderColors: ["#FFC8DD", "#BDE0FE", "#FFF0F5"],
     decorations: [
@@ -79,7 +79,7 @@ export const PRESET_THEMES: ThemeConfig[] = [
     name: "Arena de Futebol",
     keyword: "soccer stadium field",
     description: "Para pequenos craques apaixonados pelo esporte! Sinta a energia de entrar em campo com uma decoração vibrante e digna de campeão.",
-    backdropUrl: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=800&q=80", // green soccer field turf
+    backdropUrl: "/backdrops/futebol.svg", // local (antes: https://images.unsplash.com/photo-1508098682722-e99c43a406b2) // green soccer field turf
     balloonColors: ["#38B000", "#007200", "#FFFFFF", "#FFB703"],
     cylinderColors: ["#007200", "#FFFFFF", "#111111"],
     decorations: [
