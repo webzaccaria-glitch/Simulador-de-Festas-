@@ -2,33 +2,49 @@ name: Android APK (debug)
 on:
   push:
     branches: ["**"]
-    paths: ["android/**", "src/**", "capacitor.config.ts", "package.json", ".github/workflows/android-apk.yml"]
+    paths: ["android/**", "src/**", "capacitor.config.ts", "package.json", "package-lock.json", ".github/workflows/android-apk.yml"]
   workflow_dispatch:
     inputs:
       server_url:
-        description: "URL HTTPS do servidor publicado (CAP_SERVER_URL). Vazio = só interface local."
+        description: "URL HTTPS do servidor publicado (CAP_SERVER_URL). Sem ela o APK é só build de estrutura."
         required: false
 jobs:
   apk:
     runs-on: ubuntu-latest
+    env:
+      CAP_SERVER_URL: ${{ github.event.inputs.server_url || vars.CAP_SERVER_URL }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-      - uses: android-actions/setup-android@v3
+      - name: Android SDK (pré-instalado no runner)
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          [ -x "$SDKM" ] || SDKM=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | tail -1)
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Tipo de build
+        id: mode
+        run: |
+          if [ -n "$CAP_SERVER_URL" ]; then
+            echo "kind=app-funcional" >> "$GITHUB_OUTPUT"
+            echo "### APK conectado ao servidor: $CAP_SERVER_URL" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "kind=ESTRUTURA-sem-servidor" >> "$GITHUB_OUTPUT"
+            echo "::warning::CAP_SERVER_URL não definido: este APK é apenas build de ESTRUTURA (sem servidor, login/projetos não funcionam)."
+            echo "### ⚠️ APK de ESTRUTURA — não é app funcional. Defina a variável CAP_SERVER_URL (Settings → Variables) ou informe a URL ao rodar o workflow." >> "$GITHUB_STEP_SUMMARY"
+          fi
       - run: npm ci
       - run: npm run build
       - run: npx cap sync android
-        env:
-          CAP_SERVER_URL: ${{ github.event.inputs.server_url || vars.CAP_SERVER_URL }}
       - run: cd android && ./gradlew assembleDebug --no-daemon
       - uses: actions/upload-artifact@v4
         with:
-          name: festdecor3d-debug-apk
+          name: festdecor3d-debug-apk-${{ steps.mode.outputs.kind }}
           path: android/app/build/outputs/apk/debug/*.apk

@@ -6,9 +6,10 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import net from "node:net";
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "festdecor-test-"));
 
 async function freePort() {
@@ -24,7 +25,7 @@ async function freePort() {
 async function startServer(extraEnv = {}, fixedPort) {
   const port = fixedPort || (await freePort());
   const env = { ...process.env, NODE_ENV: "production", PORT: String(port), DATA_DIR, GEMINI_API_KEY: "", GOOGLE_CLIENT_ID: "", GOOGLE_CLIENT_SECRET: "", APP_URL: "", ...extraEnv };
-  const proc = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", "dist/server.cjs"], { cwd: ROOT, env, stdio: ["ignore", "pipe", "pipe"] });
+  const proc = spawn(process.execPath, ["scripts/start.cjs"], { cwd: ROOT, env, stdio: ["ignore", "pipe", "pipe"] });
   let log = "";
   proc.stdout.on("data", (d) => (log += d));
   proc.stderr.on("data", (d) => (log += d));

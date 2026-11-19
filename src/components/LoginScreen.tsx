@@ -4,10 +4,11 @@ import { Sparkles, LogIn, PlayCircle } from "lucide-react";
 interface Props {
   googleAvailable: boolean;
   demoAvailable: boolean;
+  serverDown?: boolean;
   onLoggedIn: () => void;
 }
 
-export default function LoginScreen({ googleAvailable, demoAvailable, onLoggedIn }: Props) {
+export default function LoginScreen({ googleAvailable, demoAvailable, serverDown, onLoggedIn }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +63,12 @@ export default function LoginScreen({ googleAvailable, demoAvailable, onLoggedIn
             <p className="text-slate-400 text-sm">Monte a decoração, faça o orçamento e envie ao cliente.</p>
           </div>
         </div>
+
+        {serverDown && (
+          <p role="alert" className="text-sm text-amber-200 bg-amber-950/40 border border-amber-500/30 rounded-xl p-3">
+            Servidor indisponível. Verifique a conexão. (Se este é o APK de teste sem endereço de servidor configurado, ele é apenas uma versão de estrutura.)
+          </p>
+        )}
 
         {demoAvailable && (
           <button

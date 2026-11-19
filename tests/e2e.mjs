@@ -5,17 +5,18 @@ import { spawn } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 
 const require = createRequire(import.meta.url);
 const { chromium, devices } = require("playwright");
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SHOTS = process.argv[2] || fs.mkdtempSync(path.join(os.tmpdir(), "festdecor-shots-"));
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "festdecor-e2e-"));
 const PORT = 3000 + Math.floor(Math.random() * 2000) + 3000;
 const BASE = `http://localhost:${PORT}`;
 
-const server = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", "dist/server.cjs"], {
+const server = spawn(process.execPath, ["scripts/start.cjs"], {
   cwd: ROOT,
   env: { ...process.env, NODE_ENV: "production", PORT: String(PORT), DATA_DIR, GEMINI_API_KEY: "" },
   stdio: "inherit",

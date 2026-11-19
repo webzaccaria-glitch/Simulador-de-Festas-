@@ -13,7 +13,7 @@ import Editor from "./components/Editor";
 /** Fluxo: Entrar > Projetos > Montar decoração > Orçamento > Compartilhar. */
 export default function App() {
   const [user, setUser] = useState<UserProfile | null | undefined>(undefined);
-  const [config, setConfig] = useState({ google: false, demo: true, ai: false });
+  const [config, setConfig] = useState({ google: false, demo: true, ai: false, serverDown: false });
   const [project, setProject] = useState<ProjectFull | null>(null);
 
   const loadMe = useCallback(async () => {
@@ -30,7 +30,7 @@ export default function App() {
     Promise.all([
       fetch("/api/auth/config").then((r) => r.json()).catch(() => ({})),
       fetch("/api/health").then((r) => r.json()).catch(() => ({})),
-    ]).then(([c, h]) => setConfig({ google: !!c.google, demo: c.demo !== false, ai: !!h.geminiConfigured }));
+    ]).then(([c, h]) => setConfig({ google: !!c.google, demo: c.demo !== false, ai: !!h.geminiConfigured, serverDown: !h.status }));
   }, [loadMe]);
 
   const logout = async () => {
@@ -43,7 +43,7 @@ export default function App() {
     return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center">Carregando…</div>;
   }
   if (!user) {
-    return <LoginScreen googleAvailable={config.google} demoAvailable={config.demo} onLoggedIn={loadMe} />;
+    return <LoginScreen googleAvailable={config.google} demoAvailable={config.demo && !config.serverDown} serverDown={config.serverDown} onLoggedIn={loadMe} />;
   }
   if (!project) {
     return <ProjectsScreen user={user} onOpen={setProject} onLogout={logout} />;
