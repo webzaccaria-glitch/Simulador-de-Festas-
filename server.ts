@@ -5,222 +5,117 @@
 
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
+import fs from "fs";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { openDb } from "./server/db";
+import { createAuth } from "./server/auth";
+import { registerProjectRoutes } from "./server/projects";
+import { csrfGuard, rateLimiter, safeFetch, SafeFetchError } from "./server/security";
 
-dotenv.config();
+// Carrega .env e, se existir, .env.local (o README antigo citava .env.local).
+dotenv.config({ quiet: true });
+dotenv.config({ path: ".env.local", override: false, quiet: true });
 
 let aiClient: GoogleGenAI | null = null;
 
+export function isAiConfigured(): boolean {
+  const k = process.env.GEMINI_API_KEY;
+  return !!k && k !== "MY_GEMINI_API_KEY";
+}
+
+const TEXT_MODEL = process.env.GEMINI_TEXT_MODEL || "gemini-3.5-flash";
+const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-lite-image";
+
 function getAiClient(): GoogleGenAI {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+    if (!isAiConfigured()) {
       throw new Error("GEMINI_API_KEY is not configured or has default placeholder value.");
     }
-    aiClient = new GoogleGenAI({
-      apiKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        }
-      }
-    });
+    aiClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
   }
   return aiClient;
 }
 
-const sessions = new Map<string, any>();
-
-function parseCookies(cookieHeader: string | undefined): Record<string, string> {
-  const list: Record<string, string> = {};
-  if (!cookieHeader) return list;
-  cookieHeader.split(';').forEach(cookie => {
-    const parts = cookie.split('=');
-    list[parts.shift()!.trim()] = decodeURI(parts.join('='));
-  });
-  return list;
+/** fetch com tempo limite, usado pelas camadas de busca de imagens. */
+function fetchT(url: string, init: RequestInit = {}, ms = 8000) {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(ms) });
 }
 
 async function startServer() {
   const app = express();
+  const isProd = process.env.NODE_ENV === "production";
   const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), "data"));
 
-  app.use(express.json({ limit: '10mb' }));
+  const db = openDb(DATA_DIR);
+  const auth = createAuth(db);
 
-  // API health check
+  app.disable("x-powered-by");
+  if (process.env.TRUST_PROXY !== "false") app.set("trust proxy", 1);
+  app.use((_req, res, next) => {
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("X-Frame-Options", "SAMEORIGIN");
+    next();
+  });
+  app.use("/api", express.json({ limit: "3mb" }));
+  app.use(auth.loadUser);
+  app.use("/api", csrfGuard);
+
+  const aiLimit = rateLimiter(Number(process.env.AI_RATE_LIMIT || 20), 10 * 60 * 1000);
+  const searchLimit = rateLimiter(60, 10 * 60 * 1000);
+  const proxyLimit = rateLimiter(600, 10 * 60 * 1000);
+  const limited = (limiter: (k: string) => boolean): express.RequestHandler => (req, res, next) => {
+    if (!req.user) return res.status(401).json({ error: "Faça login para continuar." });
+    if (!limiter(req.user.id)) return res.status(429).json({ error: "Muitas solicitações. Aguarde alguns minutos." });
+    next();
+  };
+  app.use(["/api/suggest-theme", "/api/generate-backdrop"], limited(aiLimit));
+  app.use("/api/search-images", limited(searchLimit));
+
+  // API health check (usado por plataformas de deploy)
   app.get("/api/health", (req, res) => {
-    const hasKey = !!process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== "MY_GEMINI_API_KEY";
-    res.json({ 
-      status: "ok", 
-      geminiConfigured: hasKey,
+    let dbOk = true;
+    try { db.prepare("SELECT 1").get(); } catch { dbOk = false; }
+    res.status(dbOk ? 200 : 503).json({
+      status: dbOk ? "ok" : "degraded",
+      db: dbOk,
+      geminiConfigured: isAiConfigured(),
       time: new Date().toISOString(),
-      googleClientConfigured: !!process.env.GOOGLE_CLIENT_ID
+      googleClientConfigured: !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET,
     });
   });
 
-  // Proxy de imagem para evitar canvas contaminados (CORS Tainted Canvas) ao salvar maquete
-  app.get("/api/proxy-image", async (req, res) => {
-    const imageUrl = req.query.url as string;
-    if (!imageUrl) {
+  auth.register(app);
+  const sweepOrphanAssets = registerProjectRoutes(app, db, DATA_DIR, auth.requireUser);
+  const runCleanup = () => {
+    try {
+      if (auth.cleanup().length) sweepOrphanAssets();
+    } catch (e: any) {
+      console.error("[limpeza]", e?.message);
+    }
+  };
+  runCleanup();
+  setInterval(runCleanup, 60 * 60 * 1000).unref();
+
+  // Proxy de imagem (evita canvas contaminado ao exportar). Protegido contra SSRF:
+  // exige sessão, só http/https públicos, timeout, limite de 8 MB e apenas imagens.
+  app.get("/api/proxy-image", limited(proxyLimit), async (req, res) => {
+    const imageUrl = typeof req.query.url === "string" ? req.query.url : "";
+    if (!imageUrl || imageUrl.length > 4096) {
       return res.status(400).send("Falta a URL da imagem.");
     }
-
     try {
-      const decodedUrl = decodeURIComponent(imageUrl);
-      
-      const response = await fetch(decodedUrl, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-        }
-      });
-
-      if (!response.ok) {
-        return res.status(response.status).send(`Erro ao buscar imagem: ${response.statusText}`);
-      }
-
-      const contentType = response.headers.get("content-type");
-      if (contentType) {
-        res.setHeader("Content-Type", contentType);
-      }
-      
-      res.setHeader("Access-Control-Allow-Origin", "*");
-      res.setHeader("Cache-Control", "public, max-age=86400"); // Cache de 1 dia
-
-      const arrayBuffer = await response.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
-      res.send(buffer);
+      const r = await safeFetch(imageUrl, { accept: (ct) => ct.startsWith("image/"), maxBytes: 8 * 1024 * 1024 });
+      res.setHeader("Content-Type", r.contentType);
+      res.setHeader("Cache-Control", "private, max-age=86400");
+      res.setHeader("Content-Security-Policy", "default-src 'none'; sandbox");
+      res.send(r.body);
     } catch (error: any) {
-      console.error("Erro no proxy de imagem:", error);
-      res.status(500).send("Erro interno ao buscar imagem: " + error.message);
+      const status = error instanceof SafeFetchError ? error.status : 502;
+      res.status(status).send(error?.message || "Erro ao buscar imagem.");
     }
-  });
-
-  // Google OAuth URL Endpoint
-  app.get("/api/auth/google/url", (req, res) => {
-    const host = req.headers.host || "localhost:3000";
-    const protocol = req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-    const redirectUri = `${protocol}/auth/callback`;
-
-    const clientId = process.env.GOOGLE_CLIENT_ID || "GOOGLE_CLIENT_ID_PLACEHOLDER";
-    
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: "code",
-      scope: "openid email profile",
-      prompt: "select_account"
-    });
-
-    res.json({ url: `https://accounts.google.com/o/oauth2/v2/auth?${params}` });
-  });
-
-  // Google OAuth Callback Handler
-  app.get(["/auth/callback", "/auth/callback/"], async (req, res) => {
-    const { code } = req.query;
-    if (!code) {
-      return res.status(400).send("Código de autorização ausente.");
-    }
-
-    try {
-      const host = req.headers.host || "localhost:3000";
-      const protocol = req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
-      const redirectUri = `${protocol}/auth/callback`;
-
-      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          code: code as string,
-          client_id: process.env.GOOGLE_CLIENT_ID || "MOCK_CLIENT_ID",
-          client_secret: process.env.GOOGLE_CLIENT_SECRET || "MOCK_CLIENT_SECRET",
-          redirect_uri: redirectUri,
-          grant_type: "authorization_code"
-        })
-      });
-
-      if (!tokenRes.ok) {
-        throw new Error("Erro ao trocar código por token no Google.");
-      }
-
-      const tokenData = await tokenRes.json();
-      const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` }
-      });
-
-      if (!userRes.ok) {
-        throw new Error("Erro ao buscar dados do usuário no Google.");
-      }
-
-      const userData = await userRes.json();
-      
-      const userProfile = {
-        name: userData.name || "Usuário Google",
-        email: userData.email,
-        picture: userData.picture || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop"
-      };
-
-      const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
-      sessions.set(sessionId, userProfile);
-
-      res.setHeader("Set-Cookie", `sessionId=${sessionId}; Path=/; Secure; SameSite=None; HttpOnly; Max-Age=86400`);
-
-      res.send(`
-        <html>
-          <body>
-            <script>
-              if (window.opener) {
-                window.opener.postMessage({ type: 'OAUTH_AUTH_SUCCESS' }, '*');
-                window.close();
-              } else {
-                window.location.href = '/';
-              }
-            </script>
-            <p>Login efetuado com sucesso! Esta janela fechará automaticamente...</p>
-          </body>
-        </html>
-      `);
-    } catch (error: any) {
-      console.error("Erro no callback de login:", error);
-      res.status(500).send("Falha na autenticação do Google: " + error.message);
-    }
-  });
-
-  // Fetch logged in user profile
-  app.get("/api/auth/me", (req, res) => {
-    const cookies = parseCookies(req.headers.cookie);
-    const sessionId = cookies.sessionId;
-    const user = sessions.get(sessionId);
-    if (user) {
-      res.json({ user });
-    } else {
-      res.status(401).json({ error: "Não autenticado" });
-    }
-  });
-
-  // Demo Login Mode (Fallback when Google credentials aren't provided yet)
-  app.post("/api/auth/demo", (req, res) => {
-    const userProfile = {
-      name: "Ana Carla Decor",
-      email: "anacarla.decor@gmail.com",
-      picture: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop&q=80"
-    };
-    const sessionId = "demo-session-id-" + Date.now();
-    sessions.set(sessionId, userProfile);
-    res.setHeader("Set-Cookie", `sessionId=${sessionId}; Path=/; Secure; SameSite=None; HttpOnly; Max-Age=86400`);
-    res.json({ success: true, user: userProfile });
-  });
-
-  // Log Out endpoint
-  app.post("/api/auth/logout", (req, res) => {
-    const cookies = parseCookies(req.headers.cookie);
-    const sessionId = cookies.sessionId;
-    if (sessionId) {
-      sessions.delete(sessionId);
-    }
-    res.setHeader("Set-Cookie", "sessionId=; Path=/; Secure; SameSite=None; HttpOnly; Max-Age=0");
-    res.json({ success: true });
   });
 
   // Função de Tradução e Otimização Dinâmica de Buscas para Estampas de Festas
@@ -437,7 +332,7 @@ async function startServer() {
       console.log(`[Buscador Google] Buscando: "${googleQuery}"`);
       const googleUrl = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(googleQuery)}`;
       
-      const response = await fetch(googleUrl, {
+      const response = await fetchT(googleUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
@@ -507,7 +402,7 @@ async function startServer() {
       console.log(`[Buscador DuckDuckGo] Iniciando busca secundária para: "${ddgQuery}"`);
       
       const ddgUrl = `https://duckduckgo.com/?q=${encodeURIComponent(ddgQuery)}`;
-      const htmlResponse = await fetch(ddgUrl, {
+      const htmlResponse = await fetchT(ddgUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
@@ -521,7 +416,7 @@ async function startServer() {
         
         if (vqdMatch) {
           const vqd = vqdMatch[1];
-          const apiResponse = await fetch(`https://duckduckgo.com/i.js?q=${encodeURIComponent(ddgQuery)}&o=json&vqd=${vqd}`, {
+          const apiResponse = await fetchT(`https://duckduckgo.com/i.js?q=${encodeURIComponent(ddgQuery)}&o=json&vqd=${vqd}`, {
             headers: {
               "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
               "Referer": "https://duckduckgo.com/"
@@ -585,7 +480,7 @@ async function startServer() {
     // CAMADA 1: Unsplash Napi oficial com cabeçalhos realistas imitando navegador real
     try {
       const searchUrl = `https://unsplash.com/napi/search/photos?query=${encodeURIComponent(searchQuery)}&per_page=16`;
-      const response = await fetch(searchUrl, {
+      const response = await fetchT(searchUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
           "Accept": "*/*",
@@ -611,7 +506,7 @@ async function startServer() {
     try {
       console.log(`Iniciando raspagem direta de HTML público para: "${searchQuery}"`);
       const scrapeUrl = `https://unsplash.com/s/photos/${encodeURIComponent(searchQuery)}`;
-      const response = await fetch(scrapeUrl, {
+      const response = await fetchT(scrapeUrl, {
         headers: {
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
           "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
@@ -666,7 +561,7 @@ Retorne um objeto JSON contendo um array de 8 itens sob a propriedade "images". 
 Retorne estritamente o JSON.`;
 
       const geminiResponse = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: TEXT_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -873,7 +768,7 @@ Retorne estritamente o JSON.`;
 
   // API Route to Suggest Theme Customizations (using text model gemini-3.5-flash)
   app.post("/api/suggest-theme", async (req, res) => {
-    const { themeName } = req.body;
+    const themeName = typeof req.body?.themeName === "string" ? req.body.themeName.trim().slice(0, 120) : "";
     if (!themeName) {
       return res.status(400).json({ error: "O nome do tema é obrigatório." });
     }
@@ -895,7 +790,7 @@ Retorne um objeto JSON com as seguintes propriedades estritas:
 Garanta que as cores hexadecimais sejam válidas (ex: "#FF5733"). Retorne apenas o JSON.`;
 
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: TEXT_MODEL,
         contents: prompt,
         config: {
           responseMimeType: "application/json",
@@ -1010,94 +905,90 @@ Garanta que as cores hexadecimais sejam válidas (ex: "#FF5733"). Retorne apenas
       res.json({
         ...defaultData,
         _isFallback: true,
-        _apiKeyMissing: !process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "MY_GEMINI_API_KEY"
+        _apiKeyMissing: !isAiConfigured()
       });
     }
   });
 
   // API Route to Generate Backdrop Pattern with AI Image (using gemini-3.1-flash-lite-image)
   app.post("/api/generate-backdrop", async (req, res) => {
-    const { prompt } = req.body;
+    const prompt = typeof req.body?.prompt === "string" ? req.body.prompt.trim().slice(0, 1000) : "";
     if (!prompt) {
       return res.status(400).json({ error: "O prompt de imagem é obrigatório." });
+    }
+    // Sem chave de IA: informa indisponibilidade com honestidade (nunca devolve imagem aleatória).
+    if (!isAiConfigured()) {
+      return res.status(503).json({
+        error: "Geração de estampa com IA indisponível neste servidor (chave de IA não configurada). Use a busca de imagens ou envie sua própria imagem.",
+        code: "AI_NOT_CONFIGURED",
+      });
     }
 
     try {
       const ai = getAiClient();
-      console.log(`Gerando imagem com o prompt: "${prompt}"...`);
-
-      // Gerando estampa de painel de alta qualidade
       const systemInstruction = "Você é um gerador de estampas e backdrops de alta qualidade para painéis de festa infantis e eventos. Crie imagens limpas, centralizadas, sem marcas d'água, sem textos ilegíveis, com cores ricas e texturas adequadas para impressão em tecido de painel (circular ou retangular).";
-      
       const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-lite-image',
-        contents: {
-          parts: [
-            { text: `${systemInstruction} Prompt de estampa: ${prompt}` }
-          ]
-        },
-        config: {
-          imageConfig: {
-            aspectRatio: "1:1",
-            imageSize: "1K"
-          }
-        }
+        model: IMAGE_MODEL,
+        contents: { parts: [{ text: `${systemInstruction} Prompt de estampa: ${prompt}` }] },
+        config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } },
       });
 
-      let base64Image = null;
-      if (response.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            base64Image = part.inlineData.data;
-            break;
-          }
+      let base64Image: string | null = null;
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData?.data) {
+          base64Image = part.inlineData.data;
+          break;
         }
       }
-
-      if (!base64Image) {
-        throw new Error("Não foi possível extrair a imagem gerada.");
-      }
-
-      res.json({
-        imageUrl: `data:image/png;base64,${base64Image}`
-      });
-
+      if (!base64Image) throw new Error("Não foi possível extrair a imagem gerada.");
+      res.json({ imageUrl: `data:image/png;base64,${base64Image}` });
     } catch (error: any) {
-      console.log("[Status] Usando imagem de alta qualidade de fallback para estampa.");
-      
-      // Oferece uma imagem mock ou avisa da falta de chave paga
-      // Usaremos picsum de alta qualidade ou uma estampa gerada com semente para evitar que a aplicação fique travada
-      const queryParam = encodeURIComponent(prompt.substring(0, 30));
-      const mockSeed = Math.floor(Math.random() * 1000);
-      const fallbackUrl = `https://picsum.photos/seed/${mockSeed}/800/800`;
-      
-      res.json({
-        imageUrl: fallbackUrl,
-        _isFallback: true,
-        _error: error.message,
-        _apiKeyMissing: !process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "MY_GEMINI_API_KEY"
-      });
+      console.error("[IA] falha na geração de estampa:", error?.message);
+      res.status(502).json({ error: "A IA não conseguiu gerar a estampa agora. Tente novamente mais tarde.", code: "AI_FAILED" });
     }
   });
 
-  // Vite integration
-  if (process.env.NODE_ENV !== "production") {
+  // Front-end: Vite em desenvolvimento, arquivos estáticos em produção.
+  if (!isProd) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    const distPath = path.join(process.cwd(), "dist");
+    if (!fs.existsSync(path.join(distPath, "index.html"))) {
+      console.error("dist/index.html não encontrado. Rode `npm run build` antes de `npm start`.");
+    }
+    app.use(express.static(distPath, {
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith("sw.js") || filePath.endsWith("index.html")) res.setHeader("Cache-Control", "no-cache");
+        else if (filePath.includes(`${path.sep}assets${path.sep}`)) res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+      },
+    }));
+    app.use("/api", (_req, res) => res.status(404).json({ error: "Rota não encontrada." }));
+    app.get("*", (_req, res) => {
+      res.setHeader("Cache-Control", "no-cache");
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+  const server = app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Servidor FestDecor3D em http://localhost:${PORT} (${isProd ? "produção" : "desenvolvimento"}, dados em ${DATA_DIR})`);
   });
+  const shutdown = () => {
+    server.close(() => {
+      try { db.close(); } catch { /* já fechado */ }
+      process.exit(0);
+    });
+    setTimeout(() => process.exit(0), 5000).unref();
+  };
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
 
-startServer();
+startServer().catch((e) => {
+  console.error("Falha ao iniciar servidor:", e);
+  process.exit(1);
+});

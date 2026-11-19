@@ -1,1 +1,17 @@
 @import "tailwindcss";
+
+/* Celular: o palco fica fixo no topo; ao focar/rolar até um controle, ele aparece abaixo do palco. */
+@media (max-width: 1023px) {
+  main section button,
+  main section input,
+  main section select,
+  main section textarea,
+  main section label {
+    scroll-margin-top: calc(42vh + 130px);
+    scroll-margin-bottom: 90px;
+  }
+}
+
+@media print {
+  body { background: #fff !important; }
+}

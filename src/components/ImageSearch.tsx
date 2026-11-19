@@ -30,10 +30,14 @@ import {
   ChevronLeft,
   Eye,
   X,
-  Maximize2
+  Maximize2,
+  Upload,
+  DoorOpen,
+  ChevronDown
 } from "lucide-react";
 import { motion } from "motion/react";
-import { getActivePanels, getPanelImage, getActiveBalloons } from "../utils";
+import { getActivePanels, getPanelImage, getActiveBalloons, PORTAL_DEFAULT_CM, cmToPx, pxToCm, panelLabel } from "../utils";
+import { uploadImageFile, listAssets } from "../api";
 
 interface ImageSearchProps {
   state: PartySetupState;
@@ -52,6 +56,36 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [generationStep, setGenerationStep] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+  // Celular: tocar na aba ativa recolhe/expande as ferramentas para liberar o palco.
+  const [toolsCollapsed, setToolsCollapsed] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [myAssets, setMyAssets] = useState<{ id: string; url: string; name?: string | null }[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    listAssets().then(setMyAssets).catch(() => {});
+  }, []);
+
+  const handleUploadFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    setErrorMessage(null);
+    try {
+      let lastUrl = "";
+      for (const f of Array.from(files).slice(0, 10)) {
+        const asset = await uploadImageFile(f);
+        lastUrl = asset.url;
+      }
+      setMyAssets(await listAssets());
+      if (lastUrl) setApplyingImageUrl(lastUrl);
+    } catch (e: any) {
+      setErrorMessage(e?.message || "Não foi possível enviar a imagem.");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
 
   // Google Image searcher states
   const [searchQuery, setSearchQuery] = useState("");
@@ -260,6 +294,11 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
       }
 
       const data = await response.json();
+      if (data._isFallback) {
+        setInfoMessage("IA indisponível no momento: aplicamos uma paleta local sugerida para este tema.");
+      } else {
+        setInfoMessage(null);
+      }
       
       const newTheme: ThemeConfig = {
         id: `custom-${Date.now()}`,
@@ -330,7 +369,8 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
       });
 
       if (!response.ok) {
-        throw new Error("Erro na geração de estampa com IA.");
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || "Erro na geração de estampa com IA.");
       }
 
       const data = await response.json();
@@ -348,18 +388,8 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
 
     } catch (err: any) {
       console.error(err);
-      setErrorMessage("Erro ao criar estampa com IA. Mostrando exemplo alternativo.");
-      const fallbackUrl = `https://picsum.photos/seed/${Math.floor(Math.random()*200)}/800/800`;
-      const currentPanels = getActivePanels(state);
-      if (state.selectedPanelId) {
-        const updated = currentPanels.map(p => p.id === state.selectedPanelId ? { ...p, customBackdropUrl: fallbackUrl } : p);
-        onUpdateState({ panels: updated, customBackdropUrl: fallbackUrl });
-      } else if (currentPanels.length > 0) {
-        const updated = currentPanels.map((p, idx) => idx === 0 ? { ...p, customBackdropUrl: fallbackUrl } : p);
-        onUpdateState({ panels: updated, customBackdropUrl: fallbackUrl, selectedPanelId: currentPanels[0].id });
-      } else {
-        onUpdateState({ customBackdropUrl: fallbackUrl });
-      }
+      // Sem imagem aleatória: informa a indisponibilidade com honestidade.
+      setErrorMessage(err?.message || "Não foi possível gerar a estampa com IA.");
     } finally {
       clearInterval(interval);
       setIsGeneratingImage(false);
@@ -401,7 +431,18 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
           return (
             <button
               key={step.id}
-              onClick={() => setActiveStep(step.id as any)}
+              onClick={() => {
+                if (activeStep === step.id) {
+                  setToolsCollapsed((c) => !c);
+                } else {
+                  setActiveStep(step.id as any);
+                  setToolsCollapsed(false);
+                  // No celular, volta ao início das ferramentas (logo abaixo do palco fixo).
+                  if (window.innerWidth < 1024) window.scrollTo({ top: 0 });
+                }
+              }}
+              aria-label={step.label}
+              aria-pressed={isSelected}
               className={`
                 flex-1 md:flex-none md:w-[72px] md:h-[72px] py-2 md:py-0 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer relative group
                 ${isSelected 
@@ -425,11 +466,93 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
       </div>
 
       {/* STEP CONTENT SWITCHER */}
-      <div className="flex-1 min-h-0 space-y-5">
+      <div className={`flex-1 min-h-0 space-y-5 ${toolsCollapsed ? "hidden md:block" : ""}`}>
+        {(errorMessage || infoMessage) && (
+          <div role="status" className={`text-xs p-3 rounded-xl border flex items-start justify-between gap-2 ${errorMessage ? "text-red-300 bg-red-950/30 border-red-500/30" : "text-amber-200 bg-amber-950/30 border-amber-500/30"}`}>
+            <span>{errorMessage || infoMessage}</span>
+            <button className="min-w-[32px] min-h-[32px] text-slate-400" aria-label="Fechar aviso" onClick={() => { setErrorMessage(null); setInfoMessage(null); }}><X className="w-4 h-4" /></button>
+          </div>
+        )}
         
         {/* ==================== TAB 2: PANELS & IMAGES ==================== */}
         {activeStep === "panels" && (
           <div className="space-y-5 animate-fadeIn">
+
+            {/* TEMA & IA + MINHAS IMAGENS */}
+            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+              <div>
+                <h4 className="font-sans font-bold text-slate-100 text-sm uppercase flex items-center gap-2 mb-2">
+                  <Palette className="w-4 h-4 text-emerald-400" /> Tema da festa
+                </h4>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {PRESET_THEMES.map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        onSelectTheme(t);
+                        setInfoMessage(null);
+                      }}
+                      className={`shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-bold border flex items-center gap-2 ${activeTheme.id === t.id ? "bg-emerald-500 text-slate-950 border-emerald-400" : "bg-slate-950 border-slate-800 text-slate-300"}`}
+                    >
+                      <span className="flex -space-x-1">
+                        {t.balloonColors.slice(0, 3).map((c, i) => (
+                          <span key={i} className="w-3 h-3 rounded-full border border-slate-900" style={{ backgroundColor: c }} />
+                        ))}
+                      </span>
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <form onSubmit={handleSearchTheme} className="flex gap-2">
+                <input
+                  value={themeSearch}
+                  onChange={(e) => setThemeSearch(e.target.value)}
+                  placeholder="Outro tema (ex.: Fazendinha)"
+                  className="flex-1 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+                />
+                <button type="submit" disabled={isSearching || !themeSearch.trim()} className="min-h-[44px] px-3 rounded-xl bg-slate-800 text-slate-100 text-xs font-bold disabled:opacity-40 flex items-center gap-1">
+                  <Sparkles className="w-4 h-4 text-amber-300" /> {isSearching ? "..." : "Sugerir"}
+                </button>
+              </form>
+
+              <div className="flex gap-2">
+                <input
+                  value={imagePrompt}
+                  onChange={(e) => setImagePrompt(e.target.value)}
+                  placeholder="Descreva uma estampa para gerar com IA"
+                  className="flex-1 min-h-[44px] bg-slate-950 border border-slate-800 rounded-xl px-3 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
+                />
+                <button type="button" onClick={handleGenerateImage} disabled={isGeneratingImage} className="min-h-[44px] px-3 rounded-xl bg-slate-800 text-slate-100 text-xs font-bold disabled:opacity-40 flex items-center gap-1">
+                  <Wand2 className="w-4 h-4 text-emerald-300" /> {isGeneratingImage ? "Gerando..." : "Gerar"}
+                </button>
+              </div>
+
+              <div>
+                <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" onChange={(e) => handleUploadFiles(e.target.files)} />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading}
+                  className="w-full min-h-[48px] rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Upload className="w-4 h-4" /> {isUploading ? "Enviando..." : "Enviar minha imagem"}
+                </button>
+                {myAssets.length > 0 && (
+                  <div className="mt-3">
+                    <span className="text-[11px] uppercase font-bold text-slate-500">Minhas imagens (toque para aplicar)</span>
+                    <div className="mt-1.5 grid grid-cols-5 gap-1.5">
+                      {myAssets.slice(0, 15).map((a) => (
+                        <button key={a.id} onClick={() => setApplyingImageUrl(a.url)} className="aspect-square rounded-lg overflow-hidden border border-slate-800 hover:border-emerald-500" aria-label={`Aplicar ${a.name || "imagem"}`}>
+                          <img src={a.url} alt={a.name || "Imagem enviada"} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
             
             {/* Active Panel Shapes & Dimensions Adders */}
             <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
@@ -448,13 +571,30 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   { id: "round", label: "Redondo (Lona)", emoji: "🔴" },
                   { id: "rectangular", label: "Retangular (Muro)", emoji: "⬜" },
                   { id: "arch", label: "Arco Romano", emoji: "🏛️" },
-                  { id: "trio_pocket", label: "Trio Pocket ✨", emoji: "🪄" }
+                  { id: "trio_pocket", label: "Trio Pocket ✨", emoji: "🪄" },
+                  { id: "portal", label: "Portal 95×220 cm", emoji: "🚪" }
                 ].map((sh) => {
                   const currentPanels = getActivePanels(state);
                   return (
                     <button
                       key={sh.id}
                       onClick={() => {
+                        if (sh.id === "portal") {
+                          // Portal: sempre retangular, 95 cm × 220 cm (medida real em cm, não em pixels).
+                          const pid = `panel_portal_${Date.now()}`;
+                          const wPx = cmToPx(PORTAL_DEFAULT_CM.w);
+                          const hPx = cmToPx(PORTAL_DEFAULT_CM.h);
+                          const off = (currentPanels.length * 20) % 80;
+                          onUpdateState({
+                            panels: [...currentPanels, {
+                              id: pid, shape: "rectangular", isPortal: true,
+                              widthCm: PORTAL_DEFAULT_CM.w, heightCm: PORTAL_DEFAULT_CM.h,
+                              x: ((340 - wPx) / 2) + off, y: 64, w: wPx, h: hPx, customBackdropUrl: null
+                            }],
+                            selectedPanelId: pid
+                          });
+                          return;
+                        }
                         const id = `panel_${sh.id}_${Date.now()}`;
                         const defaultPanelWidth = sh.id === "round" ? 170 : sh.id === "rectangular" ? 220 : sh.id === "trio_pocket" ? 280 : 130;
                         const defaultPanelHeight = sh.id === "round" ? 170 : sh.id === "rectangular" ? 150 : sh.id === "trio_pocket" ? 210 : 210;
@@ -481,7 +621,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         }
                         onUpdateState(updates);
                       }}
-                      className="py-2.5 rounded-xl text-xs font-semibold border border-slate-800 bg-slate-950 hover:border-slate-700 hover:bg-slate-900 text-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      className="min-h-[48px] py-2.5 rounded-xl text-xs font-semibold border border-slate-800 bg-slate-950 hover:border-slate-700 hover:bg-slate-900 text-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Plus className="w-3.5 h-3.5 text-emerald-400" />
                       <span>{sh.emoji} {sh.label}</span>
@@ -507,7 +647,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
                     {currentPanels.map((panel, idx) => {
                       const isSelected = state.selectedPanelId === panel.id;
-                      const shapeLabel = panel.shape === "round" ? "Redondo" : panel.shape === "rectangular" ? "Retangular" : panel.shape === "arch" ? "Arco Romano" : "Trio Pocket";
+                      const shapeLabel = panelLabel(panel, true);
                       const panelImg = getPanelImage(panel, state, activeTheme);
 
                       return (
@@ -530,9 +670,35 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                                 {idx + 1}. Painel {shapeLabel}
                                 {isSelected && <span className="text-[8px] bg-emerald-500 text-slate-950 font-extrabold px-1.5 rounded">Focado</span>}
                               </span>
-                              <span className="text-[10px] text-slate-500 font-mono">
-                                Escala real: {(panel.w * 0.012).toFixed(1)}m x {(panel.h * 0.012).toFixed(1)}m
-                              </span>
+                              {panel.isPortal ? (
+                                <span className="text-[11px] text-slate-400 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  <DoorOpen className="w-3.5 h-3.5 text-amber-300" />
+                                  <input
+                                    type="number" inputMode="numeric" min={30} max={600} aria-label="Largura do portal em cm"
+                                    value={panel.widthCm ?? PORTAL_DEFAULT_CM.w}
+                                    onChange={(e) => {
+                                      const v = Math.max(30, Math.min(600, Number(e.target.value) || PORTAL_DEFAULT_CM.w));
+                                      onUpdateState({ panels: currentPanels.map(p => p.id === panel.id ? { ...p, widthCm: v, w: cmToPx(v) } : p) });
+                                    }}
+                                    className="w-14 min-h-[32px] bg-slate-900 border border-slate-700 rounded px-1 text-slate-100"
+                                  />
+                                  ×
+                                  <input
+                                    type="number" inputMode="numeric" min={30} max={600} aria-label="Altura do portal em cm"
+                                    value={panel.heightCm ?? PORTAL_DEFAULT_CM.h}
+                                    onChange={(e) => {
+                                      const v = Math.max(30, Math.min(600, Number(e.target.value) || PORTAL_DEFAULT_CM.h));
+                                      onUpdateState({ panels: currentPanels.map(p => p.id === panel.id ? { ...p, heightCm: v, h: cmToPx(v) } : p) });
+                                    }}
+                                    className="w-14 min-h-[32px] bg-slate-900 border border-slate-700 rounded px-1 text-slate-100"
+                                  />
+                                  cm
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  Escala real: {(panel.w * 0.012).toFixed(1)}m x {(panel.h * 0.012).toFixed(1)}m
+                                </span>
+                              )}
                             </div>
                           </div>
 
@@ -3377,12 +3543,6 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
         )}
 
       </div>
-
-      {errorMessage && (
-        <p className="text-red-400 text-[10.5px] bg-red-950/20 p-2.5 rounded-xl border border-red-500/20">
-          {errorMessage}
-        </p>
-      )}
 
     </div>
   );

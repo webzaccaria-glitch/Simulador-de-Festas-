@@ -8,7 +8,7 @@ import { PartySetupState, ThemeConfig, PanelItem, BalloonItem, CakeStandItem } f
 import { motion } from "motion/react";
 import { Info, Sparkles, Move, ZoomIn, ZoomOut, Grid, RotateCw, Trash2, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Hand, Camera, Download, Share2, Send, Check, Loader2, X, SeparatorVertical, Lock, Unlock } from "lucide-react";
 import html2canvas from "html2canvas";
-import { getActivePanels, getPanelImage, getActiveBalloons } from "../utils";
+import { getActivePanels, getPanelImage, getActiveBalloons, panelLabel, pxToCm, PORTAL_DEFAULT_CM } from "../utils";
 
 const getProxiedUrl = (url: string): string => {
   if (!url) return "";
@@ -443,9 +443,13 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       selectedBalloonId: null,
       selectedCylinderIndex: null,
       selectedCakeStandId: null,
+      selectedNeonNumberId: null,
+      selectedLadderShelfId: null,
+      selectedTrayId: null,
       isTextSelected: false,
       gridVisible: false // oculta também as medidas para realismo absoluto
     });
+    const gridWasVisible = state.gridVisible;
 
     setIsExporting(true);
     setExportStatus(directDownload ? "Gerando e baixando imagem da maquete..." : "Fotografando o cenário em alta definição...");
@@ -505,7 +509,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
           useCORS: true,
           allowTaint: false,
           backgroundColor: "#020617", // slate-950 background
-          logging: true,
+          logging: false,
           scale: isMobileDevice ? 2.0 : 3.0, // Escalonamento de alta definição (3x em desktop, 2x em celular para garantir máxima nitidez na apresentação do projeto)
           scrollX: 0,
           scrollY: -window.scrollY, // Corrige o deslocamento de rolagem da tela (frequentemente causa canvas em branco)
@@ -633,9 +637,19 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
 
         window.getComputedStyle = originalGetComputedStyle;
         setIsExporting(false);
+        if (gridWasVisible) onUpdateState({ gridVisible: true });
       }
     }, 500);
   };
+
+  // Permite que a etapa "Compartilhar" peça o download do JPG.
+  const exportRef = React.useRef(handleExportImage);
+  exportRef.current = handleExportImage;
+  React.useEffect(() => {
+    const onExport = () => exportRef.current(true);
+    window.addEventListener("fd:export-jpg", onExport);
+    return () => window.removeEventListener("fd:export-jpg", onExport);
+  }, []);
 
   const handleShareImage = async () => {
     if (!exportedImgUrl) return;
@@ -993,6 +1007,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     startW: number;
     startH: number;
     startRotation: number;
+    startFontSize: number;
   } | null>(null);
 
   const handleCakeStandPointerDown = (standId: string, e: React.PointerEvent<HTMLDivElement>) => {
@@ -1507,7 +1522,7 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
 
       onUpdateState({ textX: nextX, textY: nextY });
     } else if (activeTextResize) {
-      const { type, startX, startY, startW, startH, startRotation } = activeTextResize;
+      const { type, startX, startY, startW, startH, startRotation, startFontSize } = activeTextResize;
       const dx = (e.clientX - startX) / zoom;
       const dy = (e.clientY - startY) / zoom;
 
@@ -1529,7 +1544,8 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       }
 
       const initialW = startW || 150;
-      const initialFontSize = state.textFontSize ?? 16;
+      // Corrige crescimento acumulado: escala a partir da fonte do início do gesto.
+      const initialFontSize = startFontSize;
       const newFontSize = Math.max(8, Math.min(48, Math.round((newW / initialW) * initialFontSize)));
 
       onUpdateState({ textW: newW, textH: newH, textFontSize: newFontSize, textRotation: newRotation });
@@ -1564,7 +1580,8 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
       startY: e.clientY,
       startW: state.textW ?? 150,
       startH: state.textH ?? 50,
-      startRotation: state.textRotation ?? 0
+      startRotation: state.textRotation ?? 0,
+      startFontSize: state.textFontSize ?? 16
     });
 
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -2959,7 +2976,12 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
         newH = Math.max(30, Math.min(450, startH * ratio));
       }
       
-      const updatedPanels = panelsList.map(p => p.id === panelId ? { ...p, w: newW, h: newH } : p);
+      const updatedPanels = panelsList.map(p => p.id === panelId
+        ? (p.isPortal
+            // Portal continua retangular; a medida real em cm acompanha o redimensionamento.
+            ? { ...p, w: newW, h: newH, widthCm: pxToCm(newW), heightCm: pxToCm(newH) }
+            : { ...p, w: newW, h: newH })
+        : p);
       onUpdateState({ panels: updatedPanels });
     }
   };
@@ -4298,8 +4320,10 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
     const fitClass = panel.imageFit || state.imageFit || 'cover';
     const objectFitClass = fitClass === 'contain' ? 'object-contain' : fitClass === 'fill' ? 'object-fill' : 'object-cover';
 
-    const label = shape === "round" ? "Painel Redondo" : shape === "rectangular" ? "Painel Retangular" : shape === "arch" ? "Arco Romano" : "Trio Pocket";
-    const sizeStr = `${(panel.w * 0.012).toFixed(1)}m x ${(panel.h * 0.012).toFixed(1)}m`;
+    const label = panelLabel(panel);
+    const sizeStr = panel.isPortal
+      ? `${panel.widthCm ?? PORTAL_DEFAULT_CM.w} × ${panel.heightCm ?? PORTAL_DEFAULT_CM.h} cm`
+      : `${(panel.w * 0.012).toFixed(1)}m x ${(panel.h * 0.012).toFixed(1)}m`;
 
     return (
       <div 
@@ -4549,7 +4573,15 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {(state.cylinderCustomPos || state.panels) && (
             <button
-              onClick={() => onUpdateState({ cylinderCustomPos: undefined, panels: undefined, selectedPanelId: null })}
+              onClick={() => {
+                // Recentraliza os painéis existentes mantendo IDs, imagens e medidas (antes apagava a lista e quebrava a seleção).
+                const current = getActivePanels(state);
+                onUpdateState({
+                  cylinderCustomPos: undefined,
+                  panels: current.map((p, idx) => ({ ...p, x: ((340 - p.w) / 2) + (idx - (current.length - 1) / 2) * 45, y: 64 })),
+                  selectedPanelId: null
+                });
+              }}
               className="flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:border-rose-500/50 transition-colors"
               title="Restaurar posições e tamanhos originais"
             >

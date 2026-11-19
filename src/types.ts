@@ -31,6 +31,19 @@ export interface ClientProposalData {
   themeId: string;
   conceptTitle?: string;
   conceptDescription?: string;
+  /** Itens do orçamento (gerados a partir do projeto + itens avulsos). */
+  items?: QuoteItem[];
+  /** Preço unitário memorizado por tipo de item (chave automática). */
+  priceBook?: Record<string, number>;
+  discount?: number;
+}
+
+export interface QuoteItem {
+  key: string;
+  label: string;
+  qty: number;
+  unitPrice: number;
+  auto: boolean;
 }
 
 export interface PanelItem {
@@ -46,6 +59,10 @@ export interface PanelItem {
   imagePositionX?: number;
   imagePositionY?: number;
   imageScale?: number;
+  /** Portal: painel SEMPRE retangular com medida real em cm (padrão 95 × 220 cm). */
+  isPortal?: boolean;
+  widthCm?: number;
+  heightCm?: number;
 }
 
 export interface CakeStandItem {
@@ -172,11 +189,14 @@ export interface PartySetupState {
   textFontSize?: number;
   isTextSelected?: boolean;
   textRotation?: number;
+  /** Tema personalizado (ex.: sugerido por IA) salvo junto do projeto. */
+  customTheme?: ThemeConfig | null;
 }
 
 export interface UserProfile {
   name: string;
   email: string;
   picture: string;
+  isDemo?: boolean;
 }
 

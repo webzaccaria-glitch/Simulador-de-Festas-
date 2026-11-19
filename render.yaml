@@ -1,0 +1,24 @@
+# Render (Blueprint). Disco persistente exige plano pago no Render; sem disco os dados se perdem a cada deploy.
+services:
+  - type: web
+    name: festdecor3d
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /data
+      - key: APP_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+    disk:
+      name: festdecor-data
+      mountPath: /data
+      sizeGB: 1

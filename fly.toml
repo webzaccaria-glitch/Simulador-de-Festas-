@@ -1,0 +1,34 @@
+# Deploy no Fly.io com volume persistente para o banco SQLite e imagens enviadas.
+# Passos (exigem conta Fly.io do proprietário):
+#   fly launch --no-deploy --copy-config --name <nome-do-app>
+#   fly volumes create festdecor_data --size 1 --region gru
+#   fly secrets set APP_URL=https://<nome-do-app>.fly.dev   (opcional: GEMINI_API_KEY, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+#   fly deploy
+app = "festdecor3d"
+primary_region = "gru"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  DATA_DIR = "/data"
+
+[[mounts]]
+  source = "festdecor_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"

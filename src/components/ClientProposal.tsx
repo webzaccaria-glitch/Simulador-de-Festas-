@@ -5,46 +5,56 @@
 
 import React, { useState, useRef } from "react";
 import { PartySetupState, ThemeConfig, ClientProposalData } from "../types";
-import { DollarSign, FileText, Calendar, CalendarPlus, User, Phone, Mail, MapPin, Printer, Share2, Plus, ArrowRight, CheckCircle, Smartphone, Sparkles } from "lucide-react";
+import { DollarSign, FileText, Calendar, CalendarPlus, User, Phone, Mail, MapPin, Printer, Share2, Plus, ArrowRight, CheckCircle, Smartphone, Sparkles, Trash2, RefreshCw } from "lucide-react";
+import { brl, quoteSubtotal, quoteTotal } from "../quote";
+import { formatDateBR, getActivePanels, panelLabel } from "../utils";
+
+/** Monta o texto do orçamento para WhatsApp a partir dos itens reais do projeto. */
+export function buildWhatsAppMessage(proposal: ClientProposalData): string {
+  const items = (proposal.items || []).filter((i) => i.qty > 0);
+  const lines = items.map((i) => `• ${String(i.qty).padStart(2, "0")}x ${i.label} — ${brl(i.qty * i.unitPrice)}`).join("\n");
+  const discount = Number(proposal.discount) || 0;
+  return `*FestDecor3D - Proposta de Decoração de Festa* 🌸
+
+Olá *${proposal.clientName || "cliente"}*! Aqui está a proposta de orçamento para a sua festa:
+
+*Conceito:* ${proposal.conceptTitle || "Personalizado"}
+${proposal.conceptDescription ? `*Descrição:* ${proposal.conceptDescription}\n` : ""}*Data:* ${formatDateBR(proposal.eventDate)}
+*Local:* ${proposal.eventLocation || ""}
+
+*Itens do projeto:*
+${lines || "• (sem itens)"}
+${discount ? `Desconto: - ${brl(discount)}\n` : ""}----------------------------------
+*TOTAL DO PROJETO:* ${brl(quoteTotal(proposal))}
+
+Ficamos à disposição para fechamento de contrato!`;
+}
+
+export function openWhatsApp(proposal: ClientProposalData) {
+  const cleanPhone = (proposal.clientPhone || "").replace(/\D/g, "");
+  const phone = cleanPhone && cleanPhone.length <= 11 ? `55${cleanPhone}` : cleanPhone;
+  window.open(`https://api.whatsapp.com/send?${phone ? `phone=${phone}&` : ""}text=${encodeURIComponent(buildWhatsAppMessage(proposal))}`, "_blank");
+}
 
 interface ClientProposalProps {
   state: PartySetupState;
   activeTheme: ThemeConfig;
   onUpdateState: (updates: Partial<PartySetupState>) => void;
+  proposal: ClientProposalData;
+  onProposalChange: (next: ClientProposalData) => void;
+  onResyncItems?: () => void;
 }
 
-export default function ClientProposal({ state, activeTheme, onUpdateState }: ClientProposalProps) {
-  // Client proposal state
-  const [proposal, setProposal] = useState<ClientProposalData>({
-    clientName: "Ana Paula Silva",
-    clientEmail: "anapaula@exemplo.com",
-    clientPhone: "(11) 98765-4321",
-    eventDate: "2026-08-15",
-    eventLocation: "Espaço Planeta Kids, São Paulo - SP",
-    notes: "Deseja arco de balões desconstruído volumoso e cilindros encapados combinando.",
-    pricePanel: 350.00,
-    priceCylinders: 180.00,
-    priceBalloons: 250.00,
-    priceDecorations: 120.00,
-    priceTotal: 900.00,
-    themeId: activeTheme.id,
-    conceptTitle: "",
-    conceptDescription: "",
-  });
+export default function ClientProposal({ state, activeTheme, onUpdateState, proposal, onProposalChange, onResyncItems }: ClientProposalProps) {
+  // Proposta controlada pelo App (persistida junto do projeto no servidor).
+  const setProposal = (fn: ClientProposalData | ((prev: ClientProposalData) => ClientProposalData)) => {
+    const next = typeof fn === "function" ? (fn as any)(proposal) : fn;
+    onProposalChange({ ...next, priceTotal: quoteTotal(next) });
+  };
 
   const [isSaved, setIsSaved] = useState(false);
   const [showPresentationMode, setShowPresentationMode] = useState(false);
   const printableRef = useRef<HTMLDivElement>(null);
-
-  // Recalculate total price
-  const handlePriceChange = (field: keyof ClientProposalData, val: string) => {
-    const numVal = parseFloat(val) || 0;
-    setProposal(prev => {
-      const updated = { ...prev, [field]: numVal };
-      const total = updated.pricePanel + updated.priceCylinders + updated.priceBalloons + updated.priceDecorations;
-      return { ...updated, priceTotal: total };
-    });
-  };
 
   const handleTextChange = (field: keyof ClientProposalData, val: string) => {
     setProposal(prev => ({ ...prev, [field]: val }));
@@ -55,12 +65,23 @@ export default function ClientProposal({ state, activeTheme, onUpdateState }: Cl
     window.print();
   };
 
+  // A proposta já é salva automaticamente com o projeto; este botão agenda no Google Agenda.
   const handleSave = () => {
     setIsSaved(true);
     if (proposal.eventDate) {
       window.open(getGoogleCalendarUrl(), "_blank");
     }
     setTimeout(() => setIsSaved(false), 3000);
+  };
+
+  const updateItem = (idx: number, patch: Partial<NonNullable<ClientProposalData["items"]>[number]>) => {
+    setProposal(prev => ({ ...prev, items: (prev.items || []).map((it, i) => i === idx ? { ...it, ...patch } : it) }));
+  };
+  const addManualItem = () => {
+    setProposal(prev => ({ ...prev, items: [...(prev.items || []), { key: `manual_${Date.now()}`, label: "Item avulso", qty: 1, unitPrice: 0, auto: false }] }));
+  };
+  const removeItem = (idx: number) => {
+    setProposal(prev => ({ ...prev, items: (prev.items || []).filter((_, i) => i !== idx) }));
   };
 
   const getGoogleCalendarUrl = () => {
@@ -90,40 +111,7 @@ export default function ClientProposal({ state, activeTheme, onUpdateState }: Cl
   };
 
   // WhatsApp (Zap) share helper
-  const handleWhatsAppShare = () => {
-    const formattedDate = proposal.eventDate ? new Date(proposal.eventDate).toLocaleDateString("pt-BR") : "";
-    
-    const message = `*FestDecor3D - Proposta de Decoração de Festa* 🌸
-    
-Olá *${proposal.clientName}*! Aqui está o layout virtual e a proposta de orçamento para a sua festa:
-
-*Conceito:* ${proposal.conceptTitle || "Personalizado"}
-${proposal.conceptDescription ? `*Descrição:* ${proposal.conceptDescription}\n` : ""}*Data:* ${formattedDate}
-*Local:* ${proposal.eventLocation}
-
-*Itens Inclusos no Projeto:*
-• 01x Painel ${state.shape === "round" ? "Circular 1.5m" : state.shape === "rectangular" ? "Retangular" : state.shape === "trio_pocket" ? "Trio Sobreposto Boho" : "Arco Romano"}
-• 03x Mesas de Cilindros (${state.cylinderStyle === "kraft_mdf" ? "MDF Cru / Papel Kraft 📦" : state.cylinderStyle === "rustic_wood" ? "Tronco Rústico / Ripado" : "Sublimados no Tema"})
-• Montagem Orgânica de Arco de Balões
-• Kit de Bandejas, Boleiras & Adereços de Mesa
-
-*Investimento Estimado:*
-• Painel: R$ ${proposal.pricePanel.toFixed(2)}
-• Cilindros: R$ ${proposal.priceCylinders.toFixed(2)}
-• Balões: R$ ${proposal.priceBalloons.toFixed(2)}
-• Doces/Decorações: R$ ${proposal.priceDecorations.toFixed(2)}
-----------------------------------
-*TOTAL DO PROJETO:* R$ ${proposal.priceTotal.toFixed(2)}
-
-*Visualização Virtual:* Você pode ver nossa simulação 3D abrindo o FestDecor3D no seu navegador!
-
-Ficamos à disposição para fechamento de contrato!`;
-
-    const encodedMessage = encodeURIComponent(message);
-    const cleanPhone = proposal.clientPhone.replace(/\D/g, "");
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedMessage}`;
-    window.open(whatsappUrl, "_blank");
-  };
+  const handleWhatsAppShare = () => openWhatsApp(proposal);
 
   // Theme colors to decorate the proposal UI
   const themeColorPrimary = activeTheme.balloonColors[0] || "#10b981";
@@ -268,45 +256,46 @@ Ficamos à disposição para fechamento de contrato!`;
 
         {/* Pricing break downs */}
         <div className="mt-5 pt-5 border-t border-slate-800/80">
-          <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-3">
-            Custos de Locação / Serviços (R$):
-          </span>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-              <span className="text-[9px] text-slate-500 block mb-1">Painel Temático</span>
-              <input
-                type="number"
-                value={proposal.pricePanel}
-                onChange={(e) => handlePriceChange("pricePanel", e.target.value)}
-                className="w-full bg-transparent font-semibold text-xs text-slate-100 focus:outline-none"
-              />
-            </div>
-            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-              <span className="text-[9px] text-slate-500 block mb-1">Trio de Cilindros</span>
-              <input
-                type="number"
-                value={proposal.priceCylinders}
-                onChange={(e) => handlePriceChange("priceCylinders", e.target.value)}
-                className="w-full bg-transparent font-semibold text-xs text-slate-100 focus:outline-none"
-              />
-            </div>
-            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-              <span className="text-[9px] text-slate-500 block mb-1">Arco de Balões</span>
-              <input
-                type="number"
-                value={proposal.priceBalloons}
-                onChange={(e) => handlePriceChange("priceBalloons", e.target.value)}
-                className="w-full bg-transparent font-semibold text-xs text-slate-100 focus:outline-none"
-              />
-            </div>
-            <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-              <span className="text-[9px] text-slate-500 block mb-1">Doces & Boleiras</span>
-              <input
-                type="number"
-                value={proposal.priceDecorations}
-                onChange={(e) => handlePriceChange("priceDecorations", e.target.value)}
-                className="w-full bg-transparent font-semibold text-xs text-slate-100 focus:outline-none"
-              />
+          <div className="flex items-center justify-between mb-3 gap-2">
+            <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
+              Itens do orçamento (contados da maquete)
+            </span>
+            {onResyncItems && (
+              <button onClick={onResyncItems} className="min-h-[40px] px-3 rounded-xl bg-slate-800 text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <RefreshCw className="w-3.5 h-3.5" /> Atualizar da maquete
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-2" data-testid="quote-items">
+            {(proposal.items || []).length === 0 && (
+              <p className="text-xs text-slate-500">Nenhum item. Monte a decoração ou adicione um item avulso.</p>
+            )}
+            {(proposal.items || []).map((it, idx) => (
+              <div key={it.key} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 grid grid-cols-12 gap-2 items-center">
+                {it.auto ? (
+                  <span className="col-span-12 sm:col-span-5 text-sm text-slate-100 font-semibold">{it.label}<span className="ml-1 text-[10px] text-emerald-400">(maquete)</span></span>
+                ) : (
+                  <input value={it.label} onChange={(e) => updateItem(idx, { label: e.target.value.slice(0, 120) })} aria-label="Descrição do item" className="col-span-12 sm:col-span-5 min-h-[40px] bg-slate-900 border border-slate-800 rounded-lg px-2 text-sm text-slate-100" />
+                )}
+                <label className="col-span-3 sm:col-span-2 text-[10px] text-slate-500">Qtd
+                  <input type="number" inputMode="numeric" min={0} value={it.qty} disabled={it.auto} onChange={(e) => updateItem(idx, { qty: Math.max(0, Math.round(Number(e.target.value) || 0)) })} className="w-full min-h-[40px] bg-slate-900 border border-slate-800 rounded-lg px-2 text-sm text-slate-100 disabled:opacity-70" />
+                </label>
+                <label className="col-span-5 sm:col-span-3 text-[10px] text-slate-500">Preço un. (R$)
+                  <input type="number" inputMode="decimal" min={0} step="0.01" value={it.unitPrice} onChange={(e) => updateItem(idx, { unitPrice: Math.max(0, Number(e.target.value) || 0) })} aria-label={`Preço de ${it.label}`} className="w-full min-h-[40px] bg-slate-900 border border-slate-800 rounded-lg px-2 text-sm text-slate-100" />
+                </label>
+                <div className="col-span-4 sm:col-span-2 flex items-center justify-end gap-1">
+                  <span className="text-xs font-bold text-slate-200">{brl(it.qty * it.unitPrice)}</span>
+                  {!it.auto && (
+                    <button onClick={() => removeItem(idx)} aria-label="Remover item" className="min-w-[36px] min-h-[36px] flex items-center justify-center text-slate-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                  )}
+                </div>
+              </div>
+            ))}
+            <div className="flex flex-wrap gap-2 items-center">
+              <button onClick={addManualItem} className="min-h-[44px] px-3 rounded-xl border border-slate-700 text-xs font-bold text-slate-200 flex items-center gap-1.5"><Plus className="w-4 h-4" /> Item avulso (frete, montagem...)</button>
+              <label className="text-[11px] text-slate-400 flex items-center gap-2 ml-auto">Desconto (R$)
+                <input type="number" inputMode="decimal" min={0} step="0.01" value={proposal.discount || 0} onChange={(e) => setProposal(prev => ({ ...prev, discount: Math.max(0, Number(e.target.value) || 0) }))} className="w-24 min-h-[40px] bg-slate-950 border border-slate-800 rounded-lg px-2 text-sm text-slate-100" />
+              </label>
             </div>
           </div>
 
@@ -314,15 +303,15 @@ Ficamos à disposição para fechamento de contrato!`;
             <div>
               <span className="text-xs text-slate-400 block font-medium">Investimento Estimado:</span>
               <span className="text-xl font-bold text-emerald-400 font-sans tracking-tight">
-                R$ {proposal.priceTotal.toFixed(2)}
+                <span data-testid="quote-total">{brl(quoteTotal(proposal))}</span>
               </span>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 justify-end">
               <button
                 onClick={handleSave}
                 className="bg-slate-800 hover:bg-slate-700 text-slate-100 font-bold px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer"
               >
-                Salvar Proposta
+                Agendar no Google
               </button>
               <button
                 onClick={handleWhatsAppShare}
@@ -344,7 +333,7 @@ Ficamos à disposição para fechamento de contrato!`;
           {isSaved && (
             <div className="mt-3 p-2 bg-emerald-950/20 border border-emerald-500/20 rounded-xl flex items-center gap-2 text-emerald-400 text-xs">
               <CheckCircle className="w-4 h-4" />
-              <span>Orçamento salvo no histórico local de apresentações com sucesso!</span>
+              <span>O orçamento é salvo automaticamente junto do projeto. Abrimos o Google Agenda para agendar o evento.</span>
             </div>
           )}
         </div>
@@ -389,7 +378,7 @@ Ficamos à disposição para fechamento de contrato!`;
               <span className="text-slate-400 font-extrabold block uppercase tracking-wider text-[8px] mb-1">Detalhes do Evento</span>
               <p className="font-bold text-slate-900 flex items-center gap-1 flex-wrap">
                 <Calendar className="w-3 h-3 text-slate-500" />
-                <span>{proposal.eventDate ? new Date(proposal.eventDate + "T00:00:00").toLocaleDateString("pt-BR") : ""}</span>
+                <span>{formatDateBR(proposal.eventDate)}</span>
               </p>
               <p className="text-slate-600 mt-0.5 max-w-[200px] truncate">{proposal.eventLocation}</p>
               <p className="text-slate-500 italic mt-1 line-clamp-1">"{proposal.notes}"</p>
@@ -407,7 +396,7 @@ Ficamos à disposição para fechamento de contrato!`;
             <div className="flex gap-2 items-center mt-3.5">
               <span className="text-[9px] font-bold text-slate-500">Paleta de Balões:</span>
               <div className="flex gap-1">
-                {activeTheme.balloonColors.map((col, idx) => (
+                {(state.balloonColors?.length ? state.balloonColors : activeTheme.balloonColors).map((col, idx) => (
                   <div 
                     key={idx}
                     className="w-4 h-4 rounded-full border border-slate-200 shadow-sm"
@@ -417,7 +406,7 @@ Ficamos à disposição para fechamento de contrato!`;
               </div>
               <span className="text-[9px] font-bold text-slate-500 ml-4">Cores de Cilindros:</span>
               <div className="flex gap-1">
-                {activeTheme.cylinderColors.map((col, idx) => (
+                {(state.cylinderColors?.length ? state.cylinderColors : activeTheme.cylinderColors).map((col, idx) => (
                   <div 
                     key={idx}
                     className="w-4 h-4 rounded-full border border-slate-200 shadow-sm"
@@ -433,42 +422,21 @@ Ficamos à disposição para fechamento de contrato!`;
             <span className="text-slate-400 font-extrabold block uppercase tracking-wider text-[8px] mb-2.5">Tabela de Serviços & Itens Inclusos</span>
             
             <div className="flex flex-col gap-2 text-[11px]">
-              <div className="flex justify-between py-1 border-b border-dashed border-slate-100">
-                <div className="text-slate-600">
-                  <span className="font-bold text-slate-950">01x Painel {state.shape === "round" ? "Redondo Circular" : state.shape === "rectangular" ? "Retangular de Fundo" : "Arco Romano"}</span>
-                  <p className="text-[9px] text-slate-400">Estampa personalizada em tecido sublimado premium, resistente a reflexos de foto</p>
+              {(proposal.items || []).filter(i => i.qty > 0).map((it) => (
+                <div key={it.key} className="flex justify-between py-1 border-b border-dashed border-slate-100">
+                  <div className="text-slate-600">
+                    <span className="font-bold text-slate-950">{String(it.qty).padStart(2, "0")}x {it.label}</span>
+                    <p className="text-[9px] text-slate-400">{it.qty} × {brl(it.unitPrice)}</p>
+                  </div>
+                  <span className="font-bold text-slate-900">{brl(it.qty * it.unitPrice)}</span>
                 </div>
-                <span className="font-bold text-slate-900">R$ {proposal.pricePanel.toFixed(2)}</span>
-              </div>
-               <div className="flex justify-between py-1 border-b border-dashed border-slate-100">
-                <div className="text-slate-600">
-                  <span className="font-bold text-slate-950">
-                    03x Mesas de Cilindros ({state.cylinderStyle === "kraft_mdf" ? "MDF Cru / Papel Kraft 📦" : state.cylinderStyle === "rustic_wood" ? "Tronco Rústico / Ripado" : "Sublimado/Cores do Tema"})
-                  </span>
-                  <p className="text-[9px] text-slate-400">
-                    {state.cylinderStyle === "kraft_mdf" 
-                      ? "Trio de cilindros em papel kraft natural de alta resistência (igual à imagem de referência)" 
-                      : state.cylinderStyle === "rustic_wood" 
-                        ? "Trio de cilindros amadeirados rústicos com mesa ripada central" 
-                        : "Trio de cilindros com tecidos sublimados e cores coordenadas com o tema"}
-                  </p>
+              ))}
+              {(Number(proposal.discount) || 0) > 0 && (
+                <div className="flex justify-between py-1 text-slate-600">
+                  <span>Subtotal {brl(quoteSubtotal(proposal))} — desconto</span>
+                  <span className="font-bold text-slate-900">- {brl(Number(proposal.discount))}</span>
                 </div>
-                <span className="font-bold text-slate-900">R$ {proposal.priceCylinders.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-dashed border-slate-100">
-                <div className="text-slate-600">
-                  <span className="font-bold text-slate-950">01x Montagem de Balões Cromados & Foscos ({state.balloonStyle === "organic_arch" ? "Arco Desconstruído" : "Estilo Clássico"})</span>
-                  <p className="text-[9px] text-slate-400">Montagem orgânica no local, misturando tamanhos gigantes e mini-balões cromados</p>
-                </div>
-                <span className="font-bold text-slate-900">R$ {proposal.priceBalloons.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between py-1 border-b border-dashed border-slate-100">
-                <div className="text-slate-600">
-                  <span className="font-bold text-slate-950">01x Kit de Boleiras, Bandejas & Adereços</span>
-                  <p className="text-[9px] text-slate-400">Suportes coloridos laqueados, cake stand central e arranjos temáticos de mesa</p>
-                </div>
-                <span className="font-bold text-slate-900">R$ {proposal.priceDecorations.toFixed(2)}</span>
-              </div>
+              )}
             </div>
 
             <div className="flex justify-between items-center bg-emerald-50 p-3.5 rounded-xl mt-4 border border-emerald-100">
@@ -476,7 +444,7 @@ Ficamos à disposição para fechamento de contrato!`;
                 <span className="text-[10px] text-emerald-800 font-bold block uppercase tracking-wider">Valor Líquido do Projeto</span>
                 <p className="text-[9px] text-slate-400 mt-0.5">Incluso montagem, frete de transporte e desmontagem ao final do evento</p>
               </div>
-              <span className="text-base font-black text-emerald-700">R$ {proposal.priceTotal.toFixed(2)}</span>
+              <span className="text-base font-black text-emerald-700">{brl(quoteTotal(proposal))}</span>
             </div>
           </div>
 
@@ -494,12 +462,7 @@ Ficamos à disposição para fechamento de contrato!`;
           <div className="max-w-4xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 relative flex flex-col gap-6">
             
             <button 
-              onClick={() => {
-                setShowPresentationMode(false);
-                if (proposal.eventDate) {
-                  window.open(getGoogleCalendarUrl(), "_blank");
-                }
-              }}
+              onClick={() => setShowPresentationMode(false)}
               className="absolute top-5 right-5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold w-9 h-9 rounded-full flex items-center justify-center cursor-pointer"
             >
               ✕
@@ -535,7 +498,7 @@ Ficamos à disposição para fechamento de contrato!`;
                   </div>
                   {/* Decorative organic arch overlay badge */}
                   <span className="absolute bottom-3 right-3 text-[9px] bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-semibold">
-                    {state.shape === "round" ? "Circular 1.5m" : "Retangular"} + Balões
+                    {getActivePanels(state).map(p => panelLabel(p)).join(" + ")} + Balões
                   </span>
                 </div>
                 
@@ -579,16 +542,13 @@ Ficamos à disposição para fechamento de contrato!`;
                 <div className="bg-emerald-500/5 p-4 rounded-xl border border-emerald-500/15 flex flex-col sm:flex-row gap-3 justify-between items-start sm:items-center">
                   <div>
                     <span className="text-[10px] text-slate-500 uppercase font-extrabold tracking-wider block">Orçamento Total Concluído</span>
-                    <span className="text-xl font-bold text-emerald-400">R$ {proposal.priceTotal.toFixed(2)}</span>
+                    <span className="text-xl font-bold text-emerald-400">{brl(quoteTotal(proposal))}</span>
                   </div>
                   <div className="flex gap-2 w-full sm:w-auto">
                     <button 
                       onClick={() => {
                         setShowPresentationMode(false);
-                        if (proposal.eventDate) {
-                          window.open(getGoogleCalendarUrl(), "_blank");
-                        }
-                        handlePrint();
+                        setTimeout(handlePrint, 100);
                       }}
                       className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
