@@ -52,7 +52,23 @@ export function registerProjectRoutes(app: Express, db: DB, dataDir: string, req
       .prepare(
         `SELECT id, name, theme_id, version, created_at, updated_at, deleted_at,
                 json_extract(proposal_json, '$.clientName') AS client_name,
-                json_extract(proposal_json, '$.eventDate') AS event_date
+                json_extract(proposal_json, '$.eventDate') AS event_date,
+                json_extract(proposal_json, '$.priceTotal') AS price_total,
+                json_object(
+                  'themeId', json_extract(state_json, '$.themeId'),
+                  'shape', json_extract(state_json, '$.shape'),
+                  'customBackdropUrl', json_extract(state_json, '$.customBackdropUrl'),
+                  'panels', json_extract(state_json, '$.panels'),
+                  'balloons', json_extract(state_json, '$.balloons'),
+                  'balloonStyle', json_extract(state_json, '$.balloonStyle'),
+                  'balloonColors', json_extract(state_json, '$.balloonColors'),
+                  'cylinderColors', json_extract(state_json, '$.cylinderColors'),
+                  'cylinderTypes', json_extract(state_json, '$.cylinderTypes'),
+                  'floorType', json_extract(state_json, '$.floorType'),
+                  'floorColor', json_extract(state_json, '$.floorColor'),
+                  'customThemeBackdrop', json_extract(state_json, '$.customTheme.backdropUrl'),
+                  'cylinderCustomPos', json_extract(state_json, '$.cylinderCustomPos')
+                ) AS preview
            FROM projects WHERE org_id = ? AND deleted_at IS ${trash ? "NOT NULL" : "NULL"}
           ORDER BY updated_at DESC LIMIT 500`
       )
@@ -61,6 +77,8 @@ export function registerProjectRoutes(app: Express, db: DB, dataDir: string, req
       projects: rows.map((r) => ({
         id: r.id, name: r.name, themeId: r.theme_id, version: r.version, createdAt: r.created_at,
         updatedAt: r.updated_at, deletedAt: r.deleted_at, clientName: r.client_name, eventDate: r.event_date,
+        priceTotal: typeof r.price_total === "number" ? r.price_total : null,
+        preview: (() => { try { return JSON.parse(r.preview); } catch { return null; } })(),
       })),
     });
   });

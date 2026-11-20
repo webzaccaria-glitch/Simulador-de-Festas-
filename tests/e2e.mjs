@@ -69,17 +69,18 @@ async function waitSaved(page) {
     step("palco visível e sem rolagem horizontal no celular");
 
     // Catálogo preservado: etapas e formatos
-    for (const label of ["Painel", "Balões", "Mesas", "Decor", "Geral"]) {
+    for (const label of ["Temas", "Painéis", "Balões", "Mobiliário", "Decoração", "Ambiente"]) {
       await page.getByRole("button", { name: label, exact: true }).first().waitFor();
     }
-    for (const t of ["Redondo (Lona)", "Retangular (Muro)", "Arco Romano", "Trio Pocket", "Portal 95×220 cm"]) {
+    await page.getByRole("button", { name: "Painéis", exact: true }).first().click();
+    for (const t of ["Redondo", "Retangular", "Arco romano", "Trio", "Portal 95×220 cm"]) {
       await page.getByRole("button", { name: new RegExp(t.replace(/[()×]/g, ".")) }).first().waitFor();
     }
-    await page.getByRole("button", { name: "Mesas", exact: true }).first().click();
+    await page.getByRole("button", { name: "Mobiliário", exact: true }).first().click();
     await page.getByText(/Acr[ií]lica/).first().waitFor();
-    await page.getByRole("button", { name: "Decor", exact: true }).first().click();
+    await page.getByRole("button", { name: "Decoração", exact: true }).first().click();
     await page.getByText(/neon/i).first().waitFor();
-    await page.getByRole("button", { name: "Painel", exact: true }).first().click();
+    await page.getByRole("button", { name: "Painéis", exact: true }).first().click();
     step("catálogo (etapas, formatos de painel, móveis, decor) presente");
 
     // Portal 95×220 cm
@@ -101,7 +102,7 @@ async function waitSaved(page) {
     step("autosave concluído");
 
     // Orçamento
-    await page.getByRole("button", { name: /2\. Orçamento/ }).click();
+    await page.getByRole("button", { name: /^2\s*Orçamento/ }).click();
     const items = page.getByTestId("quote-items");
     await items.getByText("Portal 95×220 cm").waitFor();
     await page.getByLabel("Preço de Portal 95×220 cm").fill("150");
@@ -118,22 +119,20 @@ async function waitSaved(page) {
     await page.getByRole("button", { name: /Abrir/ }).first().click();
     await page.getByTestId("stage").waitFor();
     await page.getByText("Portal 95×220 cm").first().waitFor();
-    await page.getByRole("button", { name: /2\. Orçamento/ }).click();
+    await page.getByRole("button", { name: /^2\s*Orçamento/ }).click();
     assert.equal(await page.getByTestId("quote-total").innerText(), totalBefore, "total persistido");
     assert.equal(await page.getByLabel("Preço de Portal 95×220 cm").inputValue(), "150");
     step("projeto e orçamento reabertos após recarregar");
 
     // Upload próprio aplicado ao painel selecionado (imagem magenta gerada no navegador)
-    await page.getByRole("button", { name: /1\. Montar/ }).click();
-    // Tocar na aba ativa recolhe as ferramentas; "Mostrar ferramentas" reabre.
-    await page.getByRole("button", { name: "Painel", exact: true }).first().click();
-    if (await page.getByRole("button", { name: /Mostrar ferramentas/ }).isVisible()) {
-      await page.getByRole("button", { name: /Mostrar ferramentas/ }).click();
-    } else {
-      await page.getByRole("button", { name: "Painel", exact: true }).first().click();
-      await page.getByRole("button", { name: /Mostrar ferramentas/ }).click();
+    await page.getByRole("button", { name: /^1\s*Montar/ }).click();
+    // Abre a categoria Temas (se já estiver ativa, tocar recolhe; "Mostrar ferramentas" reabre).
+    const uploadBtn = page.getByRole("button", { name: /Enviar minha imagem/ });
+    if (!(await uploadBtn.isVisible())) {
+      await page.getByRole("button", { name: "Temas", exact: true }).first().click();
+      if (await page.getByRole("button", { name: /Mostrar ferramentas/ }).isVisible()) await page.getByRole("button", { name: /Mostrar ferramentas/ }).click();
     }
-    await page.getByRole("button", { name: /Enviar minha imagem/ }).waitFor();
+    await uploadBtn.waitFor();
     const pngB64 = await page.evaluate(() => {
       const c = document.createElement("canvas"); c.width = c.height = 256;
       const g = c.getContext("2d"); g.fillStyle = "#FF00FF"; g.fillRect(0, 0, 256, 256);
@@ -146,11 +145,11 @@ async function waitSaved(page) {
     step("imagem enviada aplicada ao painel e salva");
 
     // Compartilhar: exportar JPG
-    await page.getByRole("button", { name: /3\. Compartilhar/ }).click();
+    await page.getByRole("button", { name: /^3\s*Enviar/ }).click();
     await page.screenshot({ path: path.join(SHOTS, "3-compartilhar.png") });
     const [download] = await Promise.all([
       page.waitForEvent("download", { timeout: 60000 }),
-      page.getByRole("button", { name: /Baixar imagem da maquete/ }).click(),
+      page.getByRole("button", { name: /Baixar imagem do cenário/ }).click(),
     ]);
     const file = path.join(SHOTS, "maquete-exportada.jpg");
     await download.saveAs(file);

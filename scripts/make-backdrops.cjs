@@ -7,7 +7,7 @@ fs.mkdirSync(out, { recursive: true });
 // Gerador pseudoaleatório determinístico (padrão estável a cada build).
 function rng(seed) { let s = seed; return () => ((s = (s * 16807) % 2147483647) / 2147483647); }
 const W = 800, H = 800;
-const wrap = (defs, body) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${defs}${body}</svg>\n`;
+const wrap = (defs, body) => `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice">${defs}${body}</svg>\n`;
 
 const themes = {
   roblox: (r) => {

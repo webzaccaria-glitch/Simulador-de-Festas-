@@ -146,6 +146,7 @@ export default function ClientProposal({ state, activeTheme, onUpdateState, prop
               <input
                 type="text"
                 value={proposal.clientName}
+                placeholder="Nome do cliente"
                 onChange={(e) => handleTextChange("clientName", e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
               />
@@ -181,6 +182,7 @@ export default function ClientProposal({ state, activeTheme, onUpdateState, prop
               <input
                 type="text"
                 value={proposal.clientPhone}
+                placeholder="(11) 90000-0000"
                 onChange={(e) => handleTextChange("clientPhone", e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
               />
@@ -195,6 +197,7 @@ export default function ClientProposal({ state, activeTheme, onUpdateState, prop
               <input
                 type="email"
                 value={proposal.clientEmail}
+                placeholder="email@cliente.com"
                 onChange={(e) => handleTextChange("clientEmail", e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
               />
@@ -209,6 +212,7 @@ export default function ClientProposal({ state, activeTheme, onUpdateState, prop
               <input
                 type="text"
                 value={proposal.eventLocation}
+                placeholder="Salão, endereço ou cidade"
                 onChange={(e) => handleTextChange("eventLocation", e.target.value)}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-9 pr-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
               />
@@ -220,6 +224,7 @@ export default function ClientProposal({ state, activeTheme, onUpdateState, prop
             <label className="text-[10px] uppercase font-bold text-slate-500">Detalhes / Observações:</label>
             <textarea
               value={proposal.notes}
+              placeholder="Pedidos do cliente, cores, horários de montagem..."
               onChange={(e) => handleTextChange("notes", e.target.value)}
               rows={2}
               className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 resize-none"
@@ -258,22 +263,22 @@ export default function ClientProposal({ state, activeTheme, onUpdateState, prop
         <div className="mt-5 pt-5 border-t border-slate-800/80">
           <div className="flex items-center justify-between mb-3 gap-2">
             <span className="text-[11px] uppercase font-bold text-slate-400 tracking-wider">
-              Itens do orçamento (contados da maquete)
+              Itens do orçamento
             </span>
             {onResyncItems && (
               <button onClick={onResyncItems} className="min-h-[40px] px-3 rounded-xl bg-slate-800 text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                <RefreshCw className="w-3.5 h-3.5" /> Atualizar da maquete
+                <RefreshCw className="w-3.5 h-3.5" /> Atualizar do cenário
               </button>
             )}
           </div>
           <div className="flex flex-col gap-2" data-testid="quote-items">
             {(proposal.items || []).length === 0 && (
-              <p className="text-xs text-slate-500">Nenhum item. Monte a decoração ou adicione um item avulso.</p>
+              <p className="text-xs text-slate-500">Nenhum item ainda. Monte o cenário ou adicione um item avulso.</p>
             )}
             {(proposal.items || []).map((it, idx) => (
               <div key={it.key} className="bg-slate-950 p-2.5 rounded-xl border border-slate-800 grid grid-cols-12 gap-2 items-center">
                 {it.auto ? (
-                  <span className="col-span-12 sm:col-span-5 text-sm text-slate-100 font-semibold">{it.label}<span className="ml-1 text-[10px] text-emerald-400">(maquete)</span></span>
+                  <span className="col-span-12 sm:col-span-5 text-sm text-slate-100 font-semibold">{it.label}<span className="ml-2 text-xs font-normal text-slate-500">do cenário</span></span>
                 ) : (
                   <input value={it.label} onChange={(e) => updateItem(idx, { label: e.target.value.slice(0, 120) })} aria-label="Descrição do item" className="col-span-12 sm:col-span-5 min-h-[40px] bg-slate-900 border border-slate-800 rounded-lg px-2 text-sm text-slate-100" />
                 )}
@@ -318,7 +323,7 @@ export default function ClientProposal({ state, activeTheme, onUpdateState, prop
                 className="bg-green-600 hover:bg-green-500 text-white font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-green-950/20"
               >
                 <Share2 className="w-3.5 h-3.5" />
-                <span>Enviar pelo ZAP</span>
+                <span>WhatsApp</span>
               </button>
               <button
                 onClick={handlePrint}
@@ -348,20 +353,20 @@ export default function ClientProposal({ state, activeTheme, onUpdateState, prop
         {/* Printable/Shareable Sheet Frame */}
         <div 
           ref={printableRef}
-          className="bg-white text-slate-800 rounded-xl p-6 border border-slate-200 shadow-lg relative print:border-none print:shadow-none"
+          className="fd-canvas bg-white text-slate-800 rounded-xl p-6 border border-slate-200 shadow-lg relative print:border-none print:shadow-none"
           style={{ fontFamily: "'Inter', sans-serif" }}
         >
           {/* Header */}
           <div className="flex justify-between items-start border-b border-slate-100 pb-5 mb-5">
             <div>
               <div className="flex items-center gap-1.5">
-                <div className="w-3.5 h-3.5 rounded-full bg-emerald-600" />
-                <span className="text-sm font-black tracking-tight text-slate-900 uppercase">FestDecor3D Premium</span>
+                <div className="w-3.5 h-3.5 rounded-full bg-violet-600" />
+                <span className="text-sm font-black tracking-tight text-slate-900 uppercase">FestDecor3D</span>
               </div>
               <p className="text-[10px] text-slate-500 mt-1">Simulação de Decoração & Projeto Personalizado</p>
             </div>
             <div className="text-right">
-              <span className="text-[10px] bg-emerald-50 text-emerald-700 font-extrabold px-2 py-0.5 rounded uppercase">PROPOSTA #DECO-{activeTheme.id.toUpperCase().substring(0, 5)}</span>
+              <span className="text-[10px] bg-violet-50 text-violet-700 font-extrabold px-2 py-0.5 rounded uppercase">PROPOSTA #DECO-{activeTheme.id.toUpperCase().substring(0, 5)}</span>
               <p className="text-[9px] text-slate-500 mt-1">Gerado em: {new Date().toLocaleDateString()}</p>
             </div>
           </div>
@@ -439,12 +444,12 @@ export default function ClientProposal({ state, activeTheme, onUpdateState, prop
               )}
             </div>
 
-            <div className="flex justify-between items-center bg-emerald-50 p-3.5 rounded-xl mt-4 border border-emerald-100">
+            <div className="flex justify-between items-center bg-violet-50 p-3.5 rounded-xl mt-4 border border-violet-100">
               <div>
-                <span className="text-[10px] text-emerald-800 font-bold block uppercase tracking-wider">Valor Líquido do Projeto</span>
+                <span className="text-[10px] text-violet-800 font-bold block uppercase tracking-wider">Valor Líquido do Projeto</span>
                 <p className="text-[9px] text-slate-400 mt-0.5">Incluso montagem, frete de transporte e desmontagem ao final do evento</p>
               </div>
-              <span className="text-base font-black text-emerald-700">{brl(quoteTotal(proposal))}</span>
+              <span className="text-base font-black text-violet-700">{brl(quoteTotal(proposal))}</span>
             </div>
           </div>
 

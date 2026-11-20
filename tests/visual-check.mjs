@@ -33,8 +33,27 @@ async function overflowReport(page) {
       if (r.right > tr.right + 1 || r.left < tr.left - 1) bad.push(`${el.tagName} "${(el.textContent || el.getAttribute("placeholder") || "").trim().slice(0, 40)}" sai da coluna (${Math.round(r.left)}-${Math.round(r.right)} vs ${Math.round(tr.left)}-${Math.round(tr.right)})`);
       if (sr && window.innerWidth >= 1024 && r.right > sr.left + 1 && r.left < sr.right && r.bottom > sr.top && r.top < sr.bottom) bad.push(`${el.tagName} "${(el.textContent || "").trim().slice(0, 40)}" fica sob o palco`);
     }
+    // Contraste: texto legível sobre o fundo efetivo (cores resolvidas pelo próprio navegador).
+    const cv = document.createElement("canvas").getContext("2d", { willReadFrequently: true });
+    const rgba = (c) => { cv.clearRect(0, 0, 1, 1); cv.fillStyle = "#000"; cv.fillStyle = c; cv.fillRect(0, 0, 1, 1); return [...cv.getImageData(0, 0, 1, 1).data]; };
+    const lum = ([r, g, b]) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
+    const bgOf = (el) => { for (let n = el; n; n = n.parentElement) { const c = getComputedStyle(n).backgroundColor; const v = rgba(c); if (v[3] > 200) return v; if (getComputedStyle(n).backgroundImage !== "none") return null; } return [248, 247, 252, 255]; };
+    for (const el of tools.querySelectorAll("*")) {
+      if (!el.childNodes.length || ![...el.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())) continue;
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height || el.closest(".fd-canvas")) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility === "hidden" || cs.opacity === "0" || el.closest("[disabled]") || el.matches("::placeholder")) continue;
+      const bg = bgOf(el);
+      if (!bg) continue;
+      const fg = rgba(cs.color);
+      const a = fg[3] / 255; const mix = [0, 1, 2].map((i) => fg[i] * a + bg[i] * (1 - a));
+      const L1 = lum(mix), L2 = lum(bg);
+      const ratio = (Math.max(L1, L2) + 0.05) / (Math.min(L1, L2) + 0.05);
+      if (ratio < 3) bad.push(`contraste baixo (${ratio.toFixed(2)}) em "${el.textContent.trim().slice(0, 40)}"`);
+    }
     if (document.documentElement.scrollWidth > window.innerWidth + 1) bad.push(`rolagem horizontal na página (${document.documentElement.scrollWidth} > ${window.innerWidth})`);
-    return bad.slice(0, 25);
+    return [...new Set(bad)].slice(0, 25);
   });
 }
 
@@ -55,13 +74,13 @@ async function overflowReport(page) {
       // Imagens padrão precisam carregar (sem texto alternativo quebrado).
       const broken = await page.evaluate(() => [...document.querySelectorAll('[data-testid="stage"] img')].filter((i) => i.complete && i.naturalWidth === 0).map((i) => i.alt || i.src));
       if (broken.length) { failures++; console.log(`✖ ${label}: imagens quebradas no palco:`, broken); }
-      for (const step of ["Painel", "Balões", "Mesas", "Decor", "Geral"]) {
+      for (const step of ["Temas", "Painéis", "Balões", "Mobiliário", "Decoração", "Ambiente"]) {
         await page.getByRole("button", { name: step, exact: true }).first().click();
         await page.waitForTimeout(250);
         const bad = await overflowReport(page);
         if (bad.length) { failures++; console.log(`✖ ${label} / ${step}:`); bad.forEach((b) => console.log("   ", b)); }
         else console.log(`✔ ${label} / ${step}: nada cortado ou escondido`);
-        if (step === "Painel" || step === "Mesas") await page.screenshot({ path: path.join(OUT, `${label}-${step}.png`), fullPage: label.startsWith("desktop") });
+        if (step === "Temas" || step === "Painéis" || step === "Mobiliário") await page.screenshot({ path: path.join(OUT, `${label}-${step}.png`), fullPage: label.startsWith("desktop") });
       }
       await ctx.close();
     }

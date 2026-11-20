@@ -45,6 +45,9 @@ export interface ProjectSummary {
   deletedAt: number | null;
   clientName?: string | null;
   eventDate?: string | null;
+  priceTotal?: number | null;
+  /** Resumo do cenário para a miniatura (painéis, balões, cores, piso). */
+  preview?: Record<string, any> | null;
 }
 
 export interface ProjectFull extends ProjectSummary {

@@ -38,6 +38,7 @@ import {
 import { motion } from "motion/react";
 import { getActivePanels, getPanelImage, getActiveBalloons, PORTAL_DEFAULT_CM, cmToPx, pxToCm, panelLabel } from "../utils";
 import { uploadImageFile, listAssets } from "../api";
+import { StructureArt, FurnitureArt, BalloonArt, DecorArt, ThemeThumb, FdGroup } from "./ui";
 
 interface ImageSearchProps {
   state: PartySetupState;
@@ -48,7 +49,7 @@ interface ImageSearchProps {
 
 export default function ImageSearch({ state, activeTheme, onUpdateState, onSelectTheme }: ImageSearchProps) {
   // Step-by-step navigation state
-  const [activeStep, setActiveStep] = useState<"panels" | "balloons" | "cylinders" | "decorations" | "settings">("panels");
+  const [activeStep, setActiveStep] = useState<"themes" | "panels" | "balloons" | "cylinders" | "decorations" | "settings">("themes");
 
   const [themeSearch, setThemeSearch] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -143,7 +144,13 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
   }, [activeTheme]);
 
   // Reactive Tab Selection & selectedTarget synchronization based on user interactions with the 3D canvas
+  const selectionSyncReady = React.useRef(false);
   useEffect(() => {
+    // Na abertura do projeto, mantém a categoria inicial (Temas); depois acompanha o que for tocado no palco.
+    if (!selectionSyncReady.current) {
+      selectionSyncReady.current = true;
+      return;
+    }
     if (state.selectedBalloonId) {
       setActiveStep("balloons");
     } else if (state.selectedPanelId) {
@@ -416,15 +423,16 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
           bg-slate-950/95 backdrop-blur-md border-t border-slate-900/80 
           px-4 py-2 flex flex-row justify-around items-center gap-1 shadow-2xl
           md:static md:z-auto md:bg-transparent md:border-t-0 md:px-0 md:py-0 md:shadow-none
-          md:flex md:flex-col md:w-24 md:min-w-[6rem] md:shrink-0 md:border-r md:border-slate-800/40 md:pr-4 md:gap-4.5 md:pb-0 md:h-fit
+          md:flex md:flex-col md:w-[96px] md:min-w-[96px] md:shrink-0 md:border-r md:border-slate-800/40 md:pr-2 md:gap-4.5 md:pb-0 md:h-fit
         "
       >
         {[
-          { id: "panels", label: "Painel", icon: ImageIcon },
+          { id: "themes", label: "Temas", icon: Palette },
+          { id: "panels", label: "Painéis", icon: ImageIcon },
           { id: "balloons", label: "Balões", icon: Wand2 },
-          { id: "cylinders", label: "Mesas", icon: Layers },
-          { id: "decorations", label: "Decor", icon: Sparkles },
-          { id: "settings", label: "Geral", icon: Settings2 }
+          { id: "cylinders", label: "Mobiliário", icon: Layers },
+          { id: "decorations", label: "Decoração", icon: Sparkles },
+          { id: "settings", label: "Ambiente", icon: Settings2 }
         ].map((step) => {
           const isSelected = activeStep === step.id;
           const IconComponent = step.icon;
@@ -444,9 +452,9 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
               aria-label={step.label}
               aria-pressed={isSelected}
               className={`
-                flex-1 md:flex-none md:w-[72px] md:h-[72px] py-2 md:py-0 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer relative group
+                flex-1 md:flex-none md:w-full md:h-[72px] py-2 md:py-0 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all cursor-pointer relative group
                 ${isSelected 
-                  ? "bg-emerald-500 border border-emerald-400 text-slate-950 shadow-lg shadow-emerald-500/10 scale-105 font-black" 
+                  ? "bg-emerald-500 border border-emerald-400 text-slate-950 font-bold" 
                   : "bg-slate-950/40 md:bg-transparent border border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"
                 }
               `}
@@ -484,16 +492,210 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
         )}
         
         {/* ==================== TAB 2: PANELS & IMAGES ==================== */}
-        {activeStep === "panels" && (
-          <div className="space-y-5 animate-fadeIn">
+        {/* Destino da imagem: disponível em todas as categorias */}
+        {(() => {
+              if (!applyingImageUrl) return null;
 
-            {/* TEMA & IA + MINHAS IMAGENS */}
-            <div className="bg-slate-900 p-4 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+              const getTargetOptions = () => {
+                const options = [];
+                const activePanels = getActivePanels(state);
+                
+                // Add specific active panels
+                activePanels.forEach((panel, index) => {
+                  let name = "Painel";
+                  let icon = "";
+                  if (panel.shape === "round") {
+                    name = `Painel Redondo ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
+                    icon = "";
+                  } else if (panel.shape === "arch") {
+                    name = `Portal / Romano Lateral ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
+                    icon = "";
+                  } else if (panel.shape === "trio_pocket") {
+                    name = `Painel Trio Pocket ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
+                    icon = "";
+                  } else if (panel.shape === "rectangular") {
+                    name = `Painel Retangular ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
+                    icon = "";
+                  } else {
+                    name = `Painel (${panel.shape}) ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
+                    icon = "";
+                  }
+                  
+                  options.push({
+                    id: panel.id,
+                    name,
+                    icon,
+                    category: "Painéis / Fundos"
+                  });
+                });
+
+                if (activePanels.length > 1) {
+                  options.push({
+                    id: "panel_all",
+                    name: "Sincronizar em todos os Painéis",
+                    icon: "",
+                    category: "Painéis / Fundos"
+                  });
+                }
+
+                // Cylinders
+                options.push({
+                  id: "trio",
+                  name: "Todo o Trio de Cilindros (Sincronizado)",
+                  icon: "",
+                  category: "Cilindros / Mesas"
+                });
+                options.push({
+                  id: "cyl0",
+                  name: "Cilindro P - Pequeno (Esquerdo)",
+                  icon: "",
+                  category: "Cilindros / Mesas"
+                });
+                options.push({
+                  id: "cyl1",
+                  name: "Cilindro G - Grande (Centro)",
+                  icon: "",
+                  category: "Cilindros / Mesas"
+                });
+                options.push({
+                  id: "cyl2",
+                  name: "Cilindro M - Médio (Direito)",
+                  icon: "",
+                  category: "Cilindros / Mesas"
+                });
+
+                // Floor
+                options.push({
+                  id: "floor",
+                  name: "Tapete / Chão do Cenário",
+                  icon: "",
+                  category: "Outros Elementos"
+                });
+
+                return options;
+              };
+
+              const targetOptions = getTargetOptions();
+              const activeOption = targetOptions.find(o => o.id === selectedTarget) || targetOptions[0];
+
+              return (
+                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
+                  <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-visible max-w-md w-full shadow-2xl flex flex-col p-6 space-y-4">
+                    {/* Header */}
+                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                      <div className="flex items-center gap-2">
+                        <Palette className="w-5 h-5 text-emerald-400" />
+                        <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
+                          Aplicar Estampa no Cenário
+                        </h4>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setApplyingImageUrl(null);
+                          setIsDropdownOpen(false);
+                        }}
+                        className="bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-100 p-1.5 rounded-xl transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Mini Preview of the chosen Image */}
+                    <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-2xl border border-slate-850/80">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-900 flex-shrink-0 border border-slate-800">
+                        <img src={applyingImageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Estampa Selecionada</span>
+                        <p className="text-xs text-slate-300 font-semibold truncate">Toque abaixo no item de destino para aplicar</p>
+                      </div>
+                    </div>
+
+                    {/* Custom dropdown selector as requested! */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                        Escolha o Item de Destino:
+                      </label>
+                      
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                          className="w-full bg-slate-950 border border-slate-850 hover:border-slate-750 px-4 py-3 rounded-2xl flex items-center justify-between transition-all cursor-pointer text-left focus:outline-none"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+                              {activeOption?.icon || null}
+                            </span>
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Item de Destino</span>
+                              <span className="text-slate-100 font-bold text-xs">{activeOption?.name || "Selecionar item..."}</span>
+                            </div>
+                          </div>
+                          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${isDropdownOpen ? "rotate-90" : ""}`} />
+                        </button>
+
+                        {isDropdownOpen && (
+                          <div className="absolute top-full left-0 right-0 z-50 mt-1.5 bg-slate-950 border border-slate-850 rounded-2xl shadow-2xl overflow-hidden max-h-[220px] overflow-y-auto divide-y divide-slate-900">
+                            {targetOptions.map((opt) => (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTarget(opt.id);
+                                  setIsDropdownOpen(false);
+                                }}
+                                className={`w-full text-left px-4 py-2.5 hover:bg-slate-900/80 flex items-center gap-2.5 transition-colors cursor-pointer ${
+                                  selectedTarget === opt.id ? "bg-slate-900" : ""
+                                }`}
+                              >
+                                <span className="text-base">{opt.icon}</span>
+                                <div>
+                                  <span className={`text-xs font-bold block ${selectedTarget === opt.id ? "text-emerald-400" : "text-slate-300"}`}>
+                                    {opt.name}
+                                  </span>
+                                  <span className="text-[8px] text-slate-500 uppercase font-semibold">{opt.category}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Big Action Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleApplyPastedUrl(selectedTarget || activeOption?.id || "panel", applyingImageUrl);
+                        setApplyingImageUrl(null);
+                        setPastedImageUrl(applyingImageUrl); // Replicates manual link
+                        setIsDropdownOpen(false);
+                      }}
+                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 px-4 rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-500/10"
+                    >
+                      <Check className="w-4 h-4 text-slate-950" />
+                      <span>Confirmar e Aplicar</span>
+                    </button>
+
+                    {/* Footer hint */}
+                    <p className="text-[10px] text-slate-500 text-center italic">
+                      A imagem será aplicada na hora e o cenário atualizado automaticamente!
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
+        {activeStep === "themes" && (
+          <div className="space-y-4 animate-fadeIn">
+            <FdGroup id="themes_main" title="Tema e imagens" defaultOpen={true}><div className="fd-group-inner space-y-4">
               <div>
                 <h4 className="font-sans font-bold text-slate-100 text-sm uppercase flex items-center gap-2 mb-2">
                   <Palette className="w-4 h-4 text-emerald-400" /> Tema da festa
                 </h4>
-                <div className="flex flex-wrap gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 gap-2">
                   {PRESET_THEMES.map((t) => (
                     <button
                       key={t.id}
@@ -501,14 +703,10 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         onSelectTheme(t);
                         setInfoMessage(null);
                       }}
-                      className={`min-h-[44px] max-w-full px-3 rounded-xl text-xs font-bold border flex items-center gap-2 text-left ${activeTheme.id === t.id ? "bg-emerald-500 text-slate-950 border-emerald-400" : "bg-slate-950 border-slate-800 text-slate-300"}`}
+                      className={`min-h-[56px] p-2 rounded-xl border flex items-center gap-3 text-left transition-colors ${activeTheme.id === t.id ? "bg-fd-primary-soft border-fd-primary text-fd-ink ring-1 ring-fd-primary" : "bg-fd-surface border-fd-line text-fd-ink hover:border-fd-primary/50"}`}
                     >
-                      <span className="flex -space-x-1">
-                        {t.balloonColors.slice(0, 3).map((c, i) => (
-                          <span key={i} className="w-3 h-3 rounded-full border border-slate-900" style={{ backgroundColor: c }} />
-                        ))}
-                      </span>
-                      {t.name}
+                      <ThemeThumb backdropUrl={t.backdropUrl} colors={t.balloonColors} className="w-11 h-11 shrink-0" />
+                      <span className="text-sm font-semibold leading-tight">{t.name}</span>
                     </button>
                   ))}
                 </div>
@@ -561,186 +759,8 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </div>
                 )}
               </div>
-            </div>
-            
-            {/* Active Panel Shapes & Dimensions Adders */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
-              <div className="flex items-center gap-2 mb-3">
-                <Layout className="w-4.5 h-4.5 text-blue-400" />
-                <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
-                  Adicionar Estruturas de Painel
-                </h4>
-              </div>
-              <p className="text-slate-400 text-xs mb-4">
-                Monte cenários de painel único ou crie composições (ex: Trio Pocket ou Arco + Redondo). Clique para adicionar ao cenário:
-              </p>
-
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { id: "round", label: "Redondo (Lona)", emoji: "🔴" },
-                  { id: "rectangular", label: "Retangular (Muro)", emoji: "⬜" },
-                  { id: "arch", label: "Arco Romano", emoji: "🏛️" },
-                  { id: "trio_pocket", label: "Trio Pocket ✨", emoji: "🪄" },
-                  { id: "portal", label: "Portal 95×220 cm", emoji: "🚪" }
-                ].map((sh) => {
-                  const currentPanels = getActivePanels(state);
-                  return (
-                    <button
-                      key={sh.id}
-                      onClick={() => {
-                        if (sh.id === "portal") {
-                          // Portal: sempre retangular, 95 cm × 220 cm (medida real em cm, não em pixels).
-                          const pid = `panel_portal_${Date.now()}`;
-                          const wPx = cmToPx(PORTAL_DEFAULT_CM.w);
-                          const hPx = cmToPx(PORTAL_DEFAULT_CM.h);
-                          const off = (currentPanels.length * 20) % 80;
-                          onUpdateState({
-                            panels: [...currentPanels, {
-                              id: pid, shape: "rectangular", isPortal: true,
-                              widthCm: PORTAL_DEFAULT_CM.w, heightCm: PORTAL_DEFAULT_CM.h,
-                              x: ((340 - wPx) / 2) + off, y: 64, w: wPx, h: hPx, customBackdropUrl: null
-                            }],
-                            selectedPanelId: pid
-                          });
-                          return;
-                        }
-                        const id = `panel_${sh.id}_${Date.now()}`;
-                        const defaultPanelWidth = sh.id === "round" ? 170 : sh.id === "rectangular" ? 220 : sh.id === "trio_pocket" ? 280 : 130;
-                        const defaultPanelHeight = sh.id === "round" ? 170 : sh.id === "rectangular" ? 150 : sh.id === "trio_pocket" ? 210 : 210;
-                        const offset = (currentPanels.length * 20) % 80;
-                        const newPanel: PanelItem = {
-                          id,
-                          shape: sh.id as any,
-                          x: ((340 - defaultPanelWidth) / 2) + offset,
-                          y: 64 + offset,
-                          w: defaultPanelWidth,
-                          h: defaultPanelHeight,
-                          customBackdropUrl: null
-                        };
-                        const updatedPanels = [...currentPanels, newPanel];
-                        
-                        const updates: Partial<PartySetupState> = {
-                          panels: updatedPanels,
-                          selectedPanelId: id
-                        };
-
-                        if (sh.id === "trio_pocket") {
-                          updates.showRusticFloorItems = true;
-                          updates.cylinderStyle = "rustic_wood";
-                        }
-                        onUpdateState(updates);
-                      }}
-                      className="min-h-[48px] py-2.5 rounded-xl text-xs font-semibold border border-slate-800 bg-slate-950 hover:border-slate-700 hover:bg-slate-900 text-slate-300 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <Plus className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>{sh.emoji} {sh.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Active Panels List */}
-            {(() => {
-              const currentPanels = getActivePanels(state);
-              if (currentPanels.length === 0) return null;
-              return (
-                <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
-                  <div className="flex items-center gap-2 mb-3">
-                    <Check className="w-4.5 h-4.5 text-emerald-400" />
-                    <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
-                      Painéis Ativos (Selecione um para mudar a estampa)
-                    </h4>
-                  </div>
-                  
-                  <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
-                    {currentPanels.map((panel, idx) => {
-                      const isSelected = state.selectedPanelId === panel.id;
-                      const shapeLabel = panelLabel(panel, true);
-                      const panelImg = getPanelImage(panel, state, activeTheme);
-
-                      return (
-                        <div 
-                          key={panel.id}
-                          onClick={() => onUpdateState({ selectedPanelId: panel.id })}
-                          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
-                            isSelected 
-                              ? "bg-emerald-500/10 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.15)] text-slate-100" 
-                              : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-900 border border-slate-800 flex-none relative">
-                              <img src={panelImg} alt="Thumbnail" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                              <div className="absolute inset-0 bg-slate-950/20" />
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-xs font-bold flex items-center gap-1.5">
-                                {idx + 1}. Painel {shapeLabel}
-                                {isSelected && <span className="text-[8px] bg-emerald-500 text-slate-950 font-extrabold px-1.5 rounded">Focado</span>}
-                              </span>
-                              {panel.isPortal ? (
-                                <span className="text-[11px] text-slate-400 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                                  <DoorOpen className="w-3.5 h-3.5 text-amber-300" />
-                                  <input
-                                    type="number" inputMode="numeric" min={30} max={600} aria-label="Largura do portal em cm"
-                                    value={panel.widthCm ?? PORTAL_DEFAULT_CM.w}
-                                    onChange={(e) => {
-                                      const v = Math.max(30, Math.min(600, Number(e.target.value) || PORTAL_DEFAULT_CM.w));
-                                      onUpdateState({ panels: currentPanels.map(p => p.id === panel.id ? { ...p, widthCm: v, w: cmToPx(v) } : p) });
-                                    }}
-                                    className="w-14 min-h-[32px] bg-slate-900 border border-slate-700 rounded px-1 text-slate-100"
-                                  />
-                                  ×
-                                  <input
-                                    type="number" inputMode="numeric" min={30} max={600} aria-label="Altura do portal em cm"
-                                    value={panel.heightCm ?? PORTAL_DEFAULT_CM.h}
-                                    onChange={(e) => {
-                                      const v = Math.max(30, Math.min(600, Number(e.target.value) || PORTAL_DEFAULT_CM.h));
-                                      onUpdateState({ panels: currentPanels.map(p => p.id === panel.id ? { ...p, heightCm: v, h: cmToPx(v) } : p) });
-                                    }}
-                                    className="w-14 min-h-[32px] bg-slate-900 border border-slate-700 rounded px-1 text-slate-100"
-                                  />
-                                  cm
-                                </span>
-                              ) : (
-                                <span className="text-[10px] text-slate-500 font-mono">
-                                  Escala real: {(panel.w * 0.012).toFixed(1)}m x {(panel.h * 0.012).toFixed(1)}m
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                            <button
-                              onClick={() => {
-                                const updated = currentPanels.filter(p => p.id !== panel.id);
-                                let nextSelectedId = state.selectedPanelId;
-                                if (isSelected) {
-                                  nextSelectedId = updated.length > 0 ? updated[0].id : null;
-                                }
-                                onUpdateState({ 
-                                  panels: updated,
-                                  selectedPanelId: nextSelectedId
-                                });
-                              }}
-                              disabled={currentPanels.length <= 1}
-                              className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors cursor-pointer"
-                              title="Excluir Painel"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
-
-            {/* BUSCADOR DE ESTAMPAS INTEGRADO */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+            </div></FdGroup>
+            <FdGroup id="themes_search" title="Buscar estampas" defaultOpen={false}><div className="fd-group-inner space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Search className="w-4.5 h-4.5 text-emerald-400" />
@@ -772,7 +792,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <span>🔍 Imagem Direta (Pura)</span>
+                    <span>Imagem Direta (Pura)</span>
                   </button>
                   <button
                     type="button"
@@ -783,7 +803,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <span>🎨 Fundo / Estampa</span>
+                    <span>Fundo / Estampa</span>
                   </button>
                   <button
                     type="button"
@@ -794,7 +814,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <span>✨ Vetor / Clipart</span>
+                    <span>Vetor / Clipart</span>
                   </button>
                   <button
                     type="button"
@@ -805,7 +825,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-200"
                     }`}
                   >
-                    <span>🎪 Painel de Festa</span>
+                    <span>Painel de Festa</span>
                   </button>
                 </div>
               </div>
@@ -1029,7 +1049,234 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </div>
                 );
               })()}
-            </div>
+            </div></FdGroup>
+            <FdGroup id="themes_link" title="Usar link de imagem" defaultOpen={false}><div className="fd-group-inner">
+              <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider mb-2">
+                Método Manual: Colar Endereço de Imagem da Internet
+              </span>
+              <div className="space-y-3 p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl">
+                <input
+                  type="text"
+                  value={pastedImageUrl}
+                  onChange={(e) => setPastedImageUrl(e.target.value)}
+                  placeholder="https://exemplo.com/estampa-painel.jpg"
+                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                />
+                
+                {pastedStatus && (
+                  <div className="text-[10px] text-emerald-400 font-bold bg-emerald-950/30 p-1.5 rounded border border-emerald-500/20 text-center animate-pulse">
+                    {pastedStatus}
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <button
+                    onClick={() => {
+                      if (!pastedImageUrl.trim()) {
+                        setPastedStatus("Cole um link de imagem válido primeiro!");
+                        setTimeout(() => setPastedStatus(null), 3000);
+                        return;
+                      }
+                      setApplyingImageUrl(pastedImageUrl);
+                    }}
+                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md active:scale-95 flex items-center justify-center gap-1.5"
+                  >
+                    <Palette className="w-3.5 h-3.5 text-slate-950" />
+                    <span>Escolher Local e Aplicar Link...</span>
+                  </button>
+                </div>
+              </div>
+            </div></FdGroup>
+          </div>
+        )}
+
+        {activeStep === "panels" && (
+          <div className="space-y-5 animate-fadeIn">
+
+            {/* TEMA & IA + MINHAS IMAGENS */}
+
+            
+            {/* Active Panel Shapes & Dimensions Adders */}
+            <FdGroup id="panels_add" title="Adicionar painel" defaultOpen={true}><div className="fd-group-inner">
+              <div className="flex items-center gap-2 mb-3">
+                <Layout className="w-4.5 h-4.5 text-blue-400" />
+                <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
+                  Adicionar Estruturas de Painel
+                </h4>
+              </div>
+              <p className="text-slate-400 text-xs mb-4">
+                Monte cenários de painel único ou crie composições (ex: Trio Pocket ou Arco + Redondo). Clique para adicionar ao cenário:
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: "round", label: "Redondo", emoji: "1,5 m de diâmetro" },
+                  { id: "rectangular", label: "Retangular", emoji: "Fundo de parede" },
+                  { id: "arch", label: "Arco romano", emoji: "1,2 × 2,2 m" },
+                  { id: "trio_pocket", label: "Trio", emoji: "Composição boho" },
+                  { id: "portal", label: "Portal 95×220 cm", emoji: "Retangular, medida real" }
+                ].map((sh) => {
+                  const currentPanels = getActivePanels(state);
+                  return (
+                    <button
+                      key={sh.id}
+                      onClick={() => {
+                        if (sh.id === "portal") {
+                          // Portal: sempre retangular, 95 cm × 220 cm (medida real em cm, não em pixels).
+                          const pid = `panel_portal_${Date.now()}`;
+                          const wPx = cmToPx(PORTAL_DEFAULT_CM.w);
+                          const hPx = cmToPx(PORTAL_DEFAULT_CM.h);
+                          const off = (currentPanels.length * 20) % 80;
+                          onUpdateState({
+                            panels: [...currentPanels, {
+                              id: pid, shape: "rectangular", isPortal: true,
+                              widthCm: PORTAL_DEFAULT_CM.w, heightCm: PORTAL_DEFAULT_CM.h,
+                              x: ((340 - wPx) / 2) + off, y: 64, w: wPx, h: hPx, customBackdropUrl: null
+                            }],
+                            selectedPanelId: pid
+                          });
+                          return;
+                        }
+                        const id = `panel_${sh.id}_${Date.now()}`;
+                        const defaultPanelWidth = sh.id === "round" ? 170 : sh.id === "rectangular" ? 220 : sh.id === "trio_pocket" ? 280 : 130;
+                        const defaultPanelHeight = sh.id === "round" ? 170 : sh.id === "rectangular" ? 150 : sh.id === "trio_pocket" ? 210 : 210;
+                        const offset = (currentPanels.length * 20) % 80;
+                        const newPanel: PanelItem = {
+                          id,
+                          shape: sh.id as any,
+                          x: ((340 - defaultPanelWidth) / 2) + offset,
+                          y: 64 + offset,
+                          w: defaultPanelWidth,
+                          h: defaultPanelHeight,
+                          customBackdropUrl: null
+                        };
+                        const updatedPanels = [...currentPanels, newPanel];
+                        
+                        const updates: Partial<PartySetupState> = {
+                          panels: updatedPanels,
+                          selectedPanelId: id
+                        };
+
+                        if (sh.id === "trio_pocket") {
+                          updates.showRusticFloorItems = true;
+                          updates.cylinderStyle = "rustic_wood";
+                        }
+                        onUpdateState(updates);
+                      }}
+                      className="min-h-[64px] p-2.5 rounded-xl border border-fd-line bg-fd-surface hover:border-fd-primary hover:bg-fd-primary-soft/40 flex items-center gap-2.5 transition-all cursor-pointer"
+                    >
+                      <StructureArt kind={sh.id as any} className="w-11 h-11 text-fd-primary shrink-0" />
+                      <span className="flex flex-col items-start text-left leading-tight">
+                        <span className="text-sm font-semibold text-fd-ink">{sh.label}</span>
+                        <span className="text-xs font-normal text-fd-muted">{sh.emoji}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div></FdGroup>
+
+            {/* Active Panels List */}
+            {(() => {
+              const currentPanels = getActivePanels(state);
+              if (currentPanels.length === 0) return null;
+              return (
+                <FdGroup id="panels_list" title="Painéis no cenário" defaultOpen={true}><div className="fd-group-inner">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Check className="w-4.5 h-4.5 text-emerald-400" />
+                    <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
+                      Painéis Ativos (Selecione um para mudar a estampa)
+                    </h4>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto pr-1">
+                    {currentPanels.map((panel, idx) => {
+                      const isSelected = state.selectedPanelId === panel.id;
+                      const shapeLabel = panelLabel(panel, true);
+                      const panelImg = getPanelImage(panel, state, activeTheme);
+
+                      return (
+                        <div 
+                          key={panel.id}
+                          onClick={() => onUpdateState({ selectedPanelId: panel.id })}
+                          className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
+                            isSelected 
+                              ? "bg-emerald-500/10 border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.15)] text-slate-100" 
+                              : "bg-slate-950 border-slate-800 hover:border-slate-700 text-slate-400"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-900 border border-slate-800 flex-none relative">
+                              <img src={panelImg} alt="Thumbnail" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              <div className="absolute inset-0 bg-slate-950/20" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold flex items-center gap-1.5">
+                                {idx + 1}. Painel {shapeLabel}
+                                {isSelected && <span className="text-[8px] bg-emerald-500 text-slate-950 font-extrabold px-1.5 rounded">Focado</span>}
+                              </span>
+                              {panel.isPortal ? (
+                                <span className="text-[11px] text-slate-400 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                  <DoorOpen className="w-3.5 h-3.5 text-amber-300" />
+                                  <input
+                                    type="number" inputMode="numeric" min={30} max={600} aria-label="Largura do portal em cm"
+                                    value={panel.widthCm ?? PORTAL_DEFAULT_CM.w}
+                                    onChange={(e) => {
+                                      const v = Math.max(30, Math.min(600, Number(e.target.value) || PORTAL_DEFAULT_CM.w));
+                                      onUpdateState({ panels: currentPanels.map(p => p.id === panel.id ? { ...p, widthCm: v, w: cmToPx(v) } : p) });
+                                    }}
+                                    className="w-14 min-h-[32px] bg-slate-900 border border-slate-700 rounded px-1 text-slate-100"
+                                  />
+                                  ×
+                                  <input
+                                    type="number" inputMode="numeric" min={30} max={600} aria-label="Altura do portal em cm"
+                                    value={panel.heightCm ?? PORTAL_DEFAULT_CM.h}
+                                    onChange={(e) => {
+                                      const v = Math.max(30, Math.min(600, Number(e.target.value) || PORTAL_DEFAULT_CM.h));
+                                      onUpdateState({ panels: currentPanels.map(p => p.id === panel.id ? { ...p, heightCm: v, h: cmToPx(v) } : p) });
+                                    }}
+                                    className="w-14 min-h-[32px] bg-slate-900 border border-slate-700 rounded px-1 text-slate-100"
+                                  />
+                                  cm
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-500 font-mono">
+                                  Escala real: {(panel.w * 0.012).toFixed(1)}m x {(panel.h * 0.012).toFixed(1)}m
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            <button
+                              onClick={() => {
+                                const updated = currentPanels.filter(p => p.id !== panel.id);
+                                let nextSelectedId = state.selectedPanelId;
+                                if (isSelected) {
+                                  nextSelectedId = updated.length > 0 ? updated[0].id : null;
+                                }
+                                onUpdateState({ 
+                                  panels: updated,
+                                  selectedPanelId: nextSelectedId
+                                });
+                              }}
+                              disabled={currentPanels.length <= 1}
+                              className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-500 transition-colors cursor-pointer"
+                              title="Excluir Painel"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div></FdGroup>
+              );
+            })()}
+
+            {/* BUSCADOR DE ESTAMPAS INTEGRADO */}
+
 
             {/* MODAL DE ZOOM DE ALTA RESOLUÇÃO (PREVIEW AMPLIADO) */}
             {previewImage && (
@@ -1092,242 +1339,13 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
             )}
 
             {/* MODAL DE SELEÇÃO DE DESTINO (MÚLTIPLOS ITENS COMO PAINEL, PORTAL, CILINDROS, TAPETE) */}
-            {(() => {
-              if (!applyingImageUrl) return null;
 
-              const getTargetOptions = () => {
-                const options = [];
-                const activePanels = getActivePanels(state);
-                
-                // Add specific active panels
-                activePanels.forEach((panel, index) => {
-                  let name = "Painel";
-                  let icon = "🖼️";
-                  if (panel.shape === "round") {
-                    name = `Painel Redondo ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
-                    icon = "🔴";
-                  } else if (panel.shape === "arch") {
-                    name = `Portal / Romano Lateral ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
-                    icon = "🏛️";
-                  } else if (panel.shape === "trio_pocket") {
-                    name = `Painel Trio Pocket ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
-                    icon = "🚪";
-                  } else if (panel.shape === "rectangular") {
-                    name = `Painel Retangular ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
-                    icon = "🟥";
-                  } else {
-                    name = `Painel (${panel.shape}) ${activePanels.length > 1 ? `#${index + 1}` : ""}`;
-                    icon = "🖼️";
-                  }
-                  
-                  options.push({
-                    id: panel.id,
-                    name,
-                    icon,
-                    category: "Painéis / Fundos"
-                  });
-                });
-
-                if (activePanels.length > 1) {
-                  options.push({
-                    id: "panel_all",
-                    name: "Sincronizar em todos os Painéis",
-                    icon: "✨",
-                    category: "Painéis / Fundos"
-                  });
-                }
-
-                // Cylinders
-                options.push({
-                  id: "trio",
-                  name: "Todo o Trio de Cilindros (Sincronizado)",
-                  icon: "🌀",
-                  category: "Cilindros / Mesas"
-                });
-                options.push({
-                  id: "cyl0",
-                  name: "Cilindro P - Pequeno (Esquerdo)",
-                  icon: "🥁",
-                  category: "Cilindros / Mesas"
-                });
-                options.push({
-                  id: "cyl1",
-                  name: "Cilindro G - Grande (Centro)",
-                  icon: "🥁",
-                  category: "Cilindros / Mesas"
-                });
-                options.push({
-                  id: "cyl2",
-                  name: "Cilindro M - Médio (Direito)",
-                  icon: "🥁",
-                  category: "Cilindros / Mesas"
-                });
-
-                // Floor
-                options.push({
-                  id: "floor",
-                  name: "Tapete / Chão do Cenário",
-                  icon: "🪵",
-                  category: "Outros Elementos"
-                });
-
-                return options;
-              };
-
-              const targetOptions = getTargetOptions();
-              const activeOption = targetOptions.find(o => o.id === selectedTarget) || targetOptions[0];
-
-              return (
-                <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-fade-in">
-                  <div className="relative bg-slate-900 border border-slate-800 rounded-3xl overflow-visible max-w-md w-full shadow-2xl flex flex-col p-6 space-y-4">
-                    {/* Header */}
-                    <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
-                      <div className="flex items-center gap-2">
-                        <Palette className="w-5 h-5 text-emerald-400" />
-                        <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
-                          Aplicar Estampa no Cenário
-                        </h4>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setApplyingImageUrl(null);
-                          setIsDropdownOpen(false);
-                        }}
-                        className="bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-100 p-1.5 rounded-xl transition-colors cursor-pointer"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Mini Preview of the chosen Image */}
-                    <div className="flex items-center gap-3 bg-slate-950/60 p-3 rounded-2xl border border-slate-850/80">
-                      <div className="w-12 h-12 rounded-lg overflow-hidden bg-slate-900 flex-shrink-0 border border-slate-800">
-                        <img src={applyingImageUrl} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Estampa Selecionada</span>
-                        <p className="text-xs text-slate-300 font-semibold truncate">Toque abaixo no item de destino para aplicar</p>
-                      </div>
-                    </div>
-
-                    {/* Custom dropdown selector as requested! */}
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
-                        Escolha o Item de Destino:
-                      </label>
-                      
-                      <div className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                          className="w-full bg-slate-950 border border-slate-850 hover:border-slate-750 px-4 py-3 rounded-2xl flex items-center justify-between transition-all cursor-pointer text-left focus:outline-none"
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg bg-slate-900 p-1.5 rounded-xl border border-slate-800">
-                              {activeOption?.icon || "🖼️"}
-                            </span>
-                            <div>
-                              <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider">Item de Destino</span>
-                              <span className="text-slate-100 font-bold text-xs">{activeOption?.name || "Selecionar item..."}</span>
-                            </div>
-                          </div>
-                          <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${isDropdownOpen ? "rotate-90" : ""}`} />
-                        </button>
-
-                        {isDropdownOpen && (
-                          <div className="absolute top-full left-0 right-0 z-50 mt-1.5 bg-slate-950 border border-slate-850 rounded-2xl shadow-2xl overflow-hidden max-h-[220px] overflow-y-auto divide-y divide-slate-900">
-                            {targetOptions.map((opt) => (
-                              <button
-                                key={opt.id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedTarget(opt.id);
-                                  setIsDropdownOpen(false);
-                                }}
-                                className={`w-full text-left px-4 py-2.5 hover:bg-slate-900/80 flex items-center gap-2.5 transition-colors cursor-pointer ${
-                                  selectedTarget === opt.id ? "bg-slate-900" : ""
-                                }`}
-                              >
-                                <span className="text-base">{opt.icon}</span>
-                                <div>
-                                  <span className={`text-xs font-bold block ${selectedTarget === opt.id ? "text-emerald-400" : "text-slate-300"}`}>
-                                    {opt.name}
-                                  </span>
-                                  <span className="text-[8px] text-slate-500 uppercase font-semibold">{opt.category}</span>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Big Action Button */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        handleApplyPastedUrl(selectedTarget || activeOption?.id || "panel", applyingImageUrl);
-                        setApplyingImageUrl(null);
-                        setPastedImageUrl(applyingImageUrl); // Replicates manual link
-                        setIsDropdownOpen(false);
-                      }}
-                      className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold py-3.5 px-4 rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-500/10"
-                    >
-                      <Check className="w-4 h-4 text-slate-950" />
-                      <span>Confirmar e Aplicar</span>
-                    </button>
-
-                    {/* Footer hint */}
-                    <p className="text-[10px] text-slate-500 text-center italic">
-                      A imagem será aplicada na hora e o cenário atualizado automaticamente!
-                    </p>
-                  </div>
-                </div>
-              );
-            })()}
 
             {/* MANUAL LINK PASTER SECTION */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
-              <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-wider mb-2">
-                Método Manual: Colar Endereço de Imagem da Internet
-              </span>
-              <div className="space-y-3 p-3.5 bg-slate-950/60 border border-slate-800/80 rounded-xl">
-                <input
-                  type="text"
-                  value={pastedImageUrl}
-                  onChange={(e) => setPastedImageUrl(e.target.value)}
-                  placeholder="https://exemplo.com/estampa-painel.jpg"
-                  className="w-full bg-slate-900 border border-slate-800 rounded-xl py-2 px-3 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-emerald-500 transition-colors"
-                />
-                
-                {pastedStatus && (
-                  <div className="text-[10px] text-emerald-400 font-bold bg-emerald-950/30 p-1.5 rounded border border-emerald-500/20 text-center animate-pulse">
-                    {pastedStatus}
-                  </div>
-                )}
 
-                <div className="space-y-1.5">
-                  <button
-                    onClick={() => {
-                      if (!pastedImageUrl.trim()) {
-                        setPastedStatus("Cole um link de imagem válido primeiro!");
-                        setTimeout(() => setPastedStatus(null), 3000);
-                        return;
-                      }
-                      setApplyingImageUrl(pastedImageUrl);
-                    }}
-                    className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md active:scale-95 flex items-center justify-center gap-1.5"
-                  >
-                    <Palette className="w-3.5 h-3.5 text-slate-950" />
-                    <span>Escolher Local e Aplicar Link...</span>
-                  </button>
-                </div>
-              </div>
-            </div>
 
             {/* PANEL TEXT OVERLAY EDITOR */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="panels_text" title="Texto no cenário" defaultOpen={false}><div className="fd-group-inner">
               <div className="flex items-center gap-2 mb-3">
                 <FileText className="w-4.5 h-4.5 text-emerald-400" />
                 <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
@@ -1425,7 +1443,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </div>
                 )}
               </div>
-            </div>
+            </div></FdGroup>
 
           </div>
         )}
@@ -1435,7 +1453,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
           <div className="space-y-5 animate-fadeIn">
             
             {/* Global Balloon Color Palette */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="balloons_colors" title="Cores dos balões" defaultOpen={true}><div className="fd-group-inner">
               <div className="flex items-center gap-2 mb-2">
                 <Palette className="w-4.5 h-4.5 text-rose-400" />
                 <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
@@ -1542,10 +1560,10 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   Limpar Paleta de Cores
                 </button>
               )}
-            </div>
+            </div></FdGroup>
 
             {/* Add New Balloon Garland Shapes */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="balloons_add" title="Adicionar balões" defaultOpen={true}><div className="fd-group-inner">
               <div className="flex items-center gap-2 mb-3">
                 <Wand2 className="w-4.5 h-4.5 text-rose-400" />
                 <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
@@ -1578,8 +1596,8 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   }}
                   className="flex items-center justify-center gap-1.5 py-3 px-3 bg-gradient-to-r from-emerald-950 to-emerald-900 border border-emerald-500 hover:from-emerald-900 hover:to-emerald-850 text-emerald-300 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer shadow-lg"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Pilar Reto (Poste)</span>
+                  <BalloonArt kind="column" className="w-10 h-10" />
+                  <span>Coluna de balões</span>
                 </button>
 
                 <button
@@ -1603,8 +1621,8 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   }}
                   className="flex items-center justify-center gap-1.5 py-3 px-3 bg-gradient-to-r from-indigo-950 to-indigo-900 border border-indigo-500 hover:from-indigo-900 hover:to-indigo-850 text-indigo-300 font-bold text-xs rounded-xl transition-all active:scale-95 cursor-pointer shadow-lg"
                 >
-                  <Plus className="w-4 h-4" />
-                  <span>+ Arco Desconstruído</span>
+                  <BalloonArt kind="arch" className="w-10 h-10" />
+                  <span>Arco de balões</span>
                 </button>
               </div>
 
@@ -1651,10 +1669,10 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </button>
                 )}
               </div>
-            </div>
+            </div></FdGroup>
 
             {/* Configure Active Balloons list and properties */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="balloons_list" title="Balões no cenário" defaultOpen={false}><div className="fd-group-inner">
               <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-3">
                 Estruturas de Balões Ativas na Maquete ({getActiveBalloons(state).length})
               </span>
@@ -1680,7 +1698,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-1.5">
                             <span className="text-sm">
-                              {balloon.type === "column" ? "🪵" : "🌈"}
+                              {balloon.type === "column" ? "" : ""}
                             </span>
                             <span className="text-xs font-bold text-slate-200">
                               {balloon.type === "column" ? "Pilar de Balão Reto" : "Arco Curvo Desconstruído"}
@@ -1711,7 +1729,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         <div className="space-y-3 mt-2.5">
                           <div>
                             <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                              <span>🔄 Rotação:</span>
+                              <span>Rotação:</span>
                               <span className="font-mono text-emerald-400 font-bold">{balloon.rotation ?? 0}°</span>
                             </div>
                             <input
@@ -1772,7 +1790,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                           {isSelected && (
                             <div className="mt-3 pt-3 border-t border-slate-900 space-y-2" onClick={(e) => e.stopPropagation()}>
                               <span className="text-[10px] font-bold text-slate-300 block">
-                                🎨 Cores Exclusivas deste Balão (Opcional):
+                                Cores Exclusivas deste Balão (Opcional):
                               </span>
                               
                               <div className="flex flex-wrap gap-1 p-2 bg-slate-950 rounded-xl border border-slate-900 min-h-8 items-center">
@@ -1834,7 +1852,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   })
                 )}
               </div>
-            </div>
+            </div></FdGroup>
 
           </div>
         )}
@@ -1844,10 +1862,10 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
           <div className="space-y-5 animate-fadeIn">
             
             {/* Decoupled Cylinders / Tables list */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="furniture" title="Mesas e móveis" defaultOpen={true}><div className="fd-group-inner">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-4">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">🪵</span>
+                  <span className="text-sm"></span>
                   <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
                     Configuração das Mesas Cilindro
                   </h4>
@@ -1884,9 +1902,9 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span className="text-xs">
-                            {cyl.idx === 0 && "🪵"}
-                            {cyl.idx === 1 && "🌟"}
-                            {cyl.idx === 2 && "💎"}
+                            {cyl.idx === 0 && ""}
+                            {cyl.idx === 1 && ""}
+                            {cyl.idx === 2 && ""}
                           </span>
                           <span className="text-xs font-bold text-slate-100">{cyl.label}</span>
                           {isFocused && (
@@ -1899,10 +1917,10 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                           {currentType === 'cylinder' ? 'Cilindro Sólido' : 
                            currentType === 'slatted_table' ? 'Mesa Ripada' : 
                            currentType === 'fluted_cylinder' ? 'Mesa Canelada' : 
-                           currentType === 'acrylic_table' ? 'Mesa Acrílica 💎' : 
-                           currentType === 'oval_drawers_table' ? 'Cômoda Oval 🪵' : 
+                           currentType === 'acrylic_table' ? 'Mesa Acrílica' : 
+                           currentType === 'oval_drawers_table' ? 'Cômoda Oval' : 
                            currentType === 'rectangular_counter' ? 'Balcão Retangular' : 
-                           currentType === 'classic_buffet' ? 'Aparador Clássico' : 'Mesa Aramada ✨'}
+                           currentType === 'classic_buffet' ? 'Aparador Clássico' : 'Mesa Aramada'}
                         </span>
                       </div>
 
@@ -1929,13 +1947,13 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                                   updatedTypes[cyl.idx] = tp.id as any;
                                   onUpdateState({ cylinderTypes: updatedTypes });
                                 }}
-                                className={`py-1 rounded text-[9px] font-bold border transition-colors cursor-pointer ${
+                                className={`py-2 min-h-[64px] rounded-lg text-xs font-semibold border transition-colors cursor-pointer flex flex-col items-center justify-center gap-1 ${
                                   currentType === tp.id 
                                     ? "bg-pink-500/10 border-pink-500 text-pink-400" 
                                     : "bg-slate-900 border-slate-850 text-slate-400 hover:text-slate-200"
                                 }`}
                               >
-                                {tp.label}
+                                <FurnitureArt kind={tp.id} className="w-8 h-8" />{tp.label}
                               </button>
                             ))}
                           </div>
@@ -2142,7 +2160,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   );
                 })}
               </div>
-            </div>
+            </div></FdGroup>
 
           </div>
         )}
@@ -2152,10 +2170,9 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
           <div className="space-y-5 animate-fadeIn">
             
             {/* Cake Stands (Suportes de Bolo & Doces) */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="decor_cake" title="Boleiras e bolo" defaultOpen={true}><div className="fd-group-inner">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">🍰</span>
                   <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
                     Bolo Cenográfico & Bandejas
                   </h4>
@@ -2393,13 +2410,13 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </div>
                 );
               })()}
-            </div>
+            </div></FdGroup>
 
             {/* Trays Section (Bandejas Decorativas) */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="decor_trays" title="Bandejas" defaultOpen={false}><div className="fd-group-inner">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">🍱</span>
+                  <span className="text-sm"></span>
                   <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
                     Bandejas Decorativas
                   </h4>
@@ -2447,9 +2464,9 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Modelo para adicionar:</span>
                   <div className="grid grid-cols-3 gap-1.5">
                     {[
-                      { id: 'rectangular_legs', label: 'Retangular c/ Pés', icon: '🍱' },
-                      { id: 'oval_beaded', label: 'Oval c/ Pérolas', icon: '🥚' },
-                      { id: 'hexagonal', label: 'Hexagonal', icon: '⬡' }
+                      { id: 'rectangular_legs', label: 'Retangular c/ Pés', icon: 'rectangular_legs' },
+                      { id: 'oval_beaded', label: 'Oval c/ Pérolas', icon: 'oval_beaded' },
+                      { id: 'hexagonal', label: 'Hexagonal', icon: 'hexagonal' }
                     ].map((model) => {
                       const isSel = selectedTrayShape === model.id;
                       return (
@@ -2462,7 +2479,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                               : "bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-300"
                           }`}
                         >
-                          <span className="text-sm">{model.icon}</span>
+                          <DecorArt kind={model.icon as any} className="w-8 h-8" />
                           <span>{model.label}</span>
                         </button>
                       );
@@ -2544,9 +2561,9 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                           <span className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider block">Mudar Modelo:</span>
                           <div className="grid grid-cols-3 gap-1.5">
                             {[
-                              { id: 'rectangular_legs', label: 'Retangular c/ Pés', icon: '🍱' },
-                              { id: 'oval_beaded', label: 'Oval c/ Pérolas', icon: '🥚' },
-                              { id: 'hexagonal', label: 'Hexagonal', icon: '⬡' }
+                              { id: 'rectangular_legs', label: 'Retangular c/ Pés', icon: 'rectangular_legs' },
+                              { id: 'oval_beaded', label: 'Oval c/ Pérolas', icon: 'oval_beaded' },
+                              { id: 'hexagonal', label: 'Hexagonal', icon: 'hexagonal' }
                             ].map((model) => {
                               const isSel = selectedTray.shape === model.id;
                               return (
@@ -2562,7 +2579,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                                       : "bg-slate-950 border-slate-855 text-slate-400 hover:text-slate-300"
                                   }`}
                                 >
-                                  <span className="text-sm">{model.icon}</span>
+                                  <DecorArt kind={model.icon as any} className="w-8 h-8" />
                                   <span>{model.label}</span>
                                 </button>
                               );
@@ -2691,13 +2708,12 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </div>
                 );
               })()}
-            </div>
+            </div></FdGroup>
 
             {/* Neon Numbers Section */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+            <FdGroup id="decor_neon" title="Números neon" defaultOpen={false}><div className="fd-group-inner space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">✨</span>
                   <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
                     Números de Neon LED
                   </h4>
@@ -2937,20 +2953,19 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
 
                         {/* Tip for users */}
                         <p className="text-[10px] text-slate-500 italic text-center">
-                          💡 Dica: Você também pode arrastar o número {activeNum.number} livremente pelo cenário!
+                          Dica: Você também pode arrastar o número {activeNum.number} livremente pelo cenário!
                         </p>
                       </div>
                     );
                   })()
                 )}
               </div>
-            </div>
+            </div></FdGroup>
 
             {/* MDF Display Ladder Shelf Section */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+            <FdGroup id="decor_ladder" title="Escadas e prateleiras" defaultOpen={false}><div className="fd-group-inner space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm">🪜</span>
                   <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
                     Estantes Escadas de MDF
                   </h4>
@@ -3149,14 +3164,14 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                         </div>
 
                         <p className="text-[10px] text-slate-500 italic text-center">
-                          💡 Dica: Você também pode arrastar a estante livremente pelo cenário!
+                          Dica: Você também pode arrastar a estante livremente pelo cenário!
                         </p>
                       </div>
                     );
                   })()
                 )}
               </div>
-            </div>
+            </div></FdGroup>
 
           </div>
         )}
@@ -3166,7 +3181,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
           <div className="space-y-5 animate-fadeIn">
             
             {/* Flooring Selector */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="env_floor" title="Chão" defaultOpen={true}><div className="fd-group-inner">
               <div className="flex items-center gap-2 mb-3">
                 <Sliders className="w-4.5 h-4.5 text-teal-400" />
                 <h4 className="font-sans font-bold text-slate-100 text-sm tracking-tight uppercase">
@@ -3180,12 +3195,12 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-1.5">
                   {[
-                    { id: "wood", label: "Madeira 🪵" },
-                    { id: "grass", label: "Grama 🌿" },
-                    { id: "white_vinyl", label: "Branco 🏳️" },
-                    { id: "marble", label: "Mármore 🏛️" },
-                    { id: "color", label: "Cor Sólida 🎨" },
-                    { id: "image", label: "Estampa 🖼️" }
+                    { id: "wood", label: "Madeira " },
+                    { id: "grass", label: "Grama " },
+                    { id: "white_vinyl", label: "Branco " },
+                    { id: "marble", label: "Mármore " },
+                    { id: "color", label: "Cor Sólida " },
+                    { id: "image", label: "Estampa " }
                   ].map((fl) => (
                     <button
                       key={fl.id}
@@ -3266,10 +3281,10 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </div>
                 )}
               </div>
-            </div>
+            </div></FdGroup>
 
             {/* Sublimation Image Fit adjustments */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl flex flex-col gap-4">
+            <FdGroup id="env_fit" title="Ajuste da imagem do painel" defaultOpen={false}><div className="fd-group-inner flex flex-col gap-4">
               {(() => {
                 const currentPanels = getActivePanels(state);
                 const selectedPanel = currentPanels.find(p => p.id === state.selectedPanelId);
@@ -3415,10 +3430,10 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </div>
                 );
               })()}
-            </div>
+            </div></FdGroup>
 
             {/* Depth Layering Organiser */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="env_layers" title="Camadas (frente e trás)" defaultOpen={false}><div className="fd-group-inner">
               <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block mb-3">
                 Profundidade & Camadas (Quem Fica na Frente)
               </span>
@@ -3454,7 +3469,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                 if (!itemType) {
                   return (
                     <div className="bg-slate-950/40 border border-slate-900 p-3.5 rounded-xl text-center text-xs text-slate-500 italic leading-relaxed">
-                      💡 <strong>Dica Pro:</strong> Toque em qualquer painel, balão ou mesa na maquete de visualização ao lado para abrir o controle de empilhamento aqui e decidir se ele fica na frente ou atrás de outros objetos!
+                      <strong>Dica Pro:</strong> Toque em qualquer painel, balão ou mesa na maquete de visualização ao lado para abrir o controle de empilhamento aqui e decidir se ele fica na frente ou atrás de outros objetos!
                     </div>
                   );
                 }
@@ -3481,7 +3496,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   <div className="bg-slate-950/70 border border-slate-800 p-3.5 rounded-xl space-y-3.5 animate-fadeIn">
                     <div className="flex items-center justify-between">
                       <span className="text-[10.5px] font-bold text-slate-300 flex items-center gap-1">
-                        <span>🎯 Elemento:</span> <strong className="text-emerald-400">{selectedItemName}</strong>
+                        <span>Elemento:</span> <strong className="text-emerald-400">{selectedItemName}</strong>
                       </span>
                       <span className="font-mono text-[9.5px] text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded border border-teal-500/20 font-bold">
                         Z-Index: {currentZIndex}
@@ -3527,10 +3542,10 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                   </div>
                 );
               })()}
-            </div>
+            </div></FdGroup>
 
             {/* Room lighting / Brightness control */}
-            <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+            <FdGroup id="env_light" title="Iluminação" defaultOpen={false}><div className="fd-group-inner">
               <div className="flex justify-between text-xs font-bold text-slate-100 mb-1.5">
                 <span>Iluminação Geral da Maquete</span>
                 <span className="text-emerald-400 font-bold">{state.brightness}%</span>
@@ -3546,7 +3561,7 @@ export default function ImageSearch({ state, activeTheme, onUpdateState, onSelec
                 onChange={(e) => onUpdateState({ brightness: parseInt(e.target.value) })}
                 className="w-full accent-emerald-500 cursor-pointer h-1.5 bg-slate-950 rounded-lg appearance-none"
               />
-            </div>
+            </div></FdGroup>
 
           </div>
         )}

@@ -4,9 +4,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowLeft, Undo2, Redo2, Layers, FileSpreadsheet, Share2, Cloud, CloudOff, Loader2,
-  Download, Printer, MessageCircle, Lightbulb, AlertCircle, X,
+  ArrowLeft, Undo2, Redo2, Cloud, CloudOff, Loader2, Check, Send, ImageDown,
+  Printer, MessageCircle, AlertCircle, X, Info,
 } from "lucide-react";
+import { BrandMark } from "./ui";
 import type { ClientProposalData, PartySetupState, ThemeConfig } from "../types";
 import { PRESET_THEMES } from "../data";
 import PartyMockup from "./PartyMockup";
@@ -232,6 +233,8 @@ export default function Editor({ project, aiConfigured, onBack }: Props) {
 
   const goBack = async () => {
     window.clearTimeout(timerRef.current);
+    // Espera um salvamento em andamento terminar antes de decidir.
+    for (let i = 0; i < 50 && savingRef.current; i++) await new Promise((r) => setTimeout(r, 100));
     if (dirtyRef.current) await save();
     if (dirtyRef.current && !window.confirm("Algumas alterações ainda não foram enviadas ao servidor (estão guardadas neste aparelho). Sair mesmo assim?")) return;
     onBack();
@@ -247,67 +250,75 @@ export default function Editor({ project, aiConfigured, onBack }: Props) {
   };
 
   const statusView = {
-    saved: { icon: <Cloud className="w-4 h-4" />, text: "Salvo", cls: "text-emerald-400" },
-    pending: { icon: <Cloud className="w-4 h-4" />, text: "Alterado", cls: "text-slate-400" },
-    saving: { icon: <Loader2 className="w-4 h-4 animate-spin" />, text: "Salvando", cls: "text-slate-300" },
-    offline: { icon: <CloudOff className="w-4 h-4" />, text: "Sem conexão", cls: "text-amber-300" },
-    conflict: { icon: <AlertCircle className="w-4 h-4" />, text: "Conflito", cls: "text-red-300" },
-    error: { icon: <AlertCircle className="w-4 h-4" />, text: "Não salvo", cls: "text-red-300" },
+    saved: { icon: <Check className="w-4 h-4" />, text: "Salvo", cls: "text-emerald-700 bg-emerald-50" },
+    pending: { icon: <Cloud className="w-4 h-4" />, text: "Alterado", cls: "text-fd-muted bg-fd-soft" },
+    saving: { icon: <Loader2 className="w-4 h-4 animate-spin" />, text: "Salvando", cls: "text-fd-muted bg-fd-soft" },
+    offline: { icon: <CloudOff className="w-4 h-4" />, text: "Sem conexão", cls: "text-amber-800 bg-amber-50" },
+    conflict: { icon: <AlertCircle className="w-4 h-4" />, text: "Conflito", cls: "text-red-700 bg-red-50" },
+    error: { icon: <AlertCircle className="w-4 h-4" />, text: "Não salvo", cls: "text-red-700 bg-red-50" },
   }[status];
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
-    { id: "design", label: "Montar", icon: <Layers className="w-4 h-4" /> },
-    { id: "proposal", label: "Orçamento", icon: <FileSpreadsheet className="w-4 h-4" /> },
-    { id: "share", label: "Compartilhar", icon: <Share2 className="w-4 h-4" /> },
+  const tabs: { id: Tab; label: string; short: string }[] = [
+    { id: "design", label: "Montar cenário", short: "Montar" },
+    { id: "proposal", label: "Orçamento", short: "Orçamento" },
+    { id: "share", label: "Enviar ao cliente", short: "Enviar" },
   ];
+  const iconBtn = "min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-fd-ink hover:bg-fd-soft disabled:opacity-30 disabled:hover:bg-transparent";
+  const total = quoteTotal(proposal);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-fd-bg text-fd-ink flex flex-col">
       {/* Cabeçalho compacto */}
-      <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur border-b border-slate-900 px-2 sm:px-4 py-2 flex flex-col gap-2 print:hidden">
-        <div className="flex items-center gap-1.5">
-          <button onClick={goBack} aria-label="Voltar aos projetos" className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center text-slate-300 hover:bg-slate-900">
+      <header className="sticky top-0 z-50 bg-fd-surface/95 backdrop-blur border-b border-fd-line print:hidden">
+        <div className="max-w-[1600px] mx-auto px-2 sm:px-4 h-[60px] flex items-center gap-1.5 sm:gap-3">
+          <button onClick={goBack} aria-label="Voltar aos projetos" title="Projetos" className={iconBtn}>
             <ArrowLeft className="w-5 h-5" />
           </button>
+          <span className="hidden md:inline-flex"><BrandMark size={30} /></span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value.slice(0, 120))}
             aria-label="Nome do projeto"
-            className="flex-1 min-w-0 min-h-[44px] bg-transparent text-base font-bold px-2 rounded-xl focus:bg-slate-900 focus:outline-none"
+            className="flex-1 min-w-0 min-h-[44px] bg-transparent text-base sm:text-lg font-semibold px-2 rounded-xl hover:bg-fd-soft focus:bg-fd-soft focus:outline-none"
           />
-          <span className={`flex items-center gap-1 text-xs font-bold px-1 ${statusView.cls}`} data-testid="save-status" aria-live="polite">
+          <span className={`hidden sm:flex items-center gap-1.5 text-sm font-medium rounded-full px-2.5 py-1 ${statusView.cls}`} data-testid="save-status" aria-live="polite">
             {statusView.icon}
-            <span className="hidden sm:inline">{statusView.text}</span>
+            <span>{statusView.text}</span>
           </span>
-          <button onClick={history.undo} disabled={!history.canUndo} aria-label="Desfazer" title="Desfazer (Ctrl+Z)" className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center bg-slate-900 disabled:opacity-30">
+          <span className={`sm:hidden flex items-center rounded-full p-1.5 ${statusView.cls}`} aria-hidden="true">{statusView.icon}</span>
+          <button onClick={history.undo} disabled={!history.canUndo} aria-label="Desfazer" title="Desfazer (Ctrl+Z)" className={iconBtn}>
             <Undo2 className="w-5 h-5" />
           </button>
-          <button onClick={history.redo} disabled={!history.canRedo} aria-label="Refazer" title="Refazer (Ctrl+Shift+Z)" className="min-w-[44px] min-h-[44px] rounded-xl flex items-center justify-center bg-slate-900 disabled:opacity-30">
+          <button onClick={history.redo} disabled={!history.canRedo} aria-label="Refazer" title="Refazer (Ctrl+Shift+Z)" className={iconBtn}>
             <Redo2 className="w-5 h-5" />
           </button>
         </div>
-        <nav className="flex bg-slate-900 p-1 rounded-2xl border border-slate-800" aria-label="Etapas">
-          {tabs.map((t, i) => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              aria-current={tab === t.id ? "step" : undefined}
-              className={`flex-1 min-h-[44px] rounded-xl text-sm font-bold flex items-center justify-center gap-1.5 ${tab === t.id ? "bg-emerald-600 text-white" : "text-slate-400"}`}
-            >
-              {t.icon}
-              <span>{i + 1}. {t.label}</span>
-            </button>
-          ))}
+        <nav className="max-w-[1600px] mx-auto px-2 sm:px-4 pb-2 flex gap-1" aria-label="Etapas">
+          {tabs.map((t, i) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                aria-current={active ? "step" : undefined}
+                className={`flex-1 sm:flex-none min-h-[44px] px-3 sm:px-4 rounded-xl text-[15px] font-semibold flex items-center justify-center gap-2 transition-colors ${active ? "bg-fd-primary text-white" : "text-fd-muted hover:bg-fd-soft hover:text-fd-ink"}`}
+              >
+                <span className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${active ? "bg-white/20" : "bg-fd-soft text-fd-ink"}`}>{i + 1}</span>
+                <span className="sm:hidden">{t.short}</span>
+                <span className="hidden sm:inline">{t.label}</span>
+              </button>
+            );
+          })}
         </nav>
       </header>
 
-      {/* Avisos */}
-      <div className="print:hidden">
+      {/* Avisos discretos */}
+      <div className="print:hidden max-w-[1600px] w-full mx-auto px-2 sm:px-4">
         {recoverable && (
-          <div className="mx-2 sm:mx-4 mt-2 p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 text-sm text-amber-100 flex flex-wrap items-center gap-2">
-            <span className="flex-1">Há alterações deste aparelho que não chegaram ao servidor.</span>
+          <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-sm text-amber-900 flex flex-wrap items-center gap-2">
+            <span className="flex-1">Há alterações deste aparelho que ainda não foram salvas no servidor.</span>
             <button
-              className="min-h-[40px] px-3 rounded-lg bg-amber-500 text-slate-950 font-bold"
+              className="min-h-[40px] px-4 rounded-lg bg-fd-primary text-white font-semibold"
               onClick={() => {
                 history.reset(recoverable.state);
                 setProposal(recoverable.proposal);
@@ -317,16 +328,16 @@ export default function Editor({ project, aiConfigured, onBack }: Props) {
             >
               Recuperar
             </button>
-            <button className="min-h-[40px] px-3 rounded-lg bg-slate-800 font-bold" onClick={() => { clearDraft(project.id); setRecoverable(null); }}>
+            <button className="min-h-[40px] px-4 rounded-lg border border-fd-line bg-fd-surface font-semibold" onClick={() => { clearDraft(project.id); setRecoverable(null); }}>
               Descartar
             </button>
           </div>
         )}
         {conflict && (
-          <div className="mx-2 sm:mx-4 mt-2 p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-sm text-red-100 flex flex-wrap items-center gap-2">
+          <div className="mt-3 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-900 flex flex-wrap items-center gap-2">
             <span className="flex-1">Este projeto foi alterado em outro aparelho.</span>
             <button
-              className="min-h-[40px] px-3 rounded-lg bg-slate-200 text-slate-950 font-bold"
+              className="min-h-[40px] px-4 rounded-lg border border-fd-line bg-fd-surface font-semibold"
               onClick={() => {
                 versionRef.current = conflict.version;
                 history.reset(conflict.state);
@@ -341,7 +352,7 @@ export default function Editor({ project, aiConfigured, onBack }: Props) {
               Usar a versão salva
             </button>
             <button
-              className="min-h-[40px] px-3 rounded-lg bg-red-600 font-bold"
+              className="min-h-[40px] px-4 rounded-lg bg-red-600 text-white font-semibold"
               onClick={() => {
                 versionRef.current = conflict.version;
                 setConflict(null);
@@ -354,46 +365,49 @@ export default function Editor({ project, aiConfigured, onBack }: Props) {
           </div>
         )}
         {statusMsg && !conflict && (
-          <p className="mx-2 sm:mx-4 mt-2 text-xs text-amber-200 bg-amber-950/30 border border-amber-500/20 rounded-xl p-2.5">{statusMsg}</p>
+          <p className="mt-3 text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-2.5">{statusMsg}</p>
         )}
         {showAiNote && tab === "design" && (
-          <div className="mx-2 sm:mx-4 mt-2 text-[11px] text-amber-200/90 bg-amber-950/20 border border-amber-500/10 rounded-xl px-3 py-2 flex items-start gap-2">
-            <AlertCircle className="w-4 h-4 flex-none mt-0.5" />
-            <span className="flex-1">IA não configurada neste servidor: gerar estampa fica indisponível e “Sugerir tema” usa paletas locais. Busca, catálogo e upload funcionam normalmente.</span>
-            <button aria-label="Fechar aviso" className="min-w-[32px] min-h-[32px]" onClick={() => setShowAiNote(false)}><X className="w-4 h-4" /></button>
+          <div className="mt-3 text-sm text-fd-muted bg-fd-surface border border-fd-line rounded-xl px-3 py-2 flex items-center gap-2">
+            <Info className="w-4 h-4 flex-none text-fd-primary" />
+            <span className="flex-1">Estampas por inteligência artificial indisponíveis aqui. Temas, busca e suas imagens funcionam normalmente.</span>
+            <button aria-label="Fechar aviso" className="min-w-[36px] min-h-[36px] rounded-lg hover:bg-fd-soft flex items-center justify-center" onClick={() => setShowAiNote(false)}><X className="w-4 h-4" /></button>
           </div>
         )}
       </div>
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-2 sm:p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
+      <main className="flex-1 max-w-[1600px] w-full mx-auto p-2 sm:p-4 grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5 items-start">
         {/* Palco: sempre montado (preserva zoom/câmera e permite exportar). No celular fica fixo no topo. */}
-        <section className={`lg:col-span-7 min-w-0 order-1 lg:order-2 lg:sticky lg:top-32 ${tab === "design" ? "sticky top-[108px] z-30 bg-slate-950 pb-2" : "hidden"}`}>
-          <div className="h-[42vh] min-h-[260px] sm:h-[420px] lg:h-[500px]" data-testid="stage">
+        <section className={`fd-legacy lg:col-span-7 xl:col-span-8 min-w-0 order-1 lg:order-2 lg:sticky lg:top-[124px] ${tab === "design" ? "sticky top-[112px] z-30 bg-fd-bg pb-2" : "hidden"}`}>
+          <div className="h-[42vh] min-h-[260px] sm:h-[440px] lg:h-[calc(100vh-150px)] lg:min-h-[480px]" data-testid="stage">
             <PartyMockup state={state} activeTheme={activeTheme} onUpdateState={handleUpdateState} />
           </div>
         </section>
 
         {tab === "design" && (
-          <section data-testid="tools-column" className="lg:col-span-5 min-w-0 flex flex-col gap-6 order-2 lg:order-1">
+          <section data-testid="tools-column" className="fd-legacy lg:col-span-5 xl:col-span-4 min-w-0 flex flex-col gap-4 order-2 lg:order-1">
             <ImageSearch state={state} activeTheme={activeTheme} onUpdateState={handleUpdateState} onSelectTheme={handleSelectTheme} />
           </section>
         )}
 
         {tab === "proposal" && (
           <>
-            <section className="lg:col-span-5 order-2 lg:order-1 print:hidden">
-              <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
-                <h4 className="font-semibold text-slate-100 text-sm uppercase flex items-center gap-1.5 mb-2">
-                  <Lightbulb className="w-4 h-4 text-emerald-400" /> Como funciona o orçamento?
-                </h4>
-                <p className="text-slate-400 text-sm leading-relaxed">
-                  Os itens são contados automaticamente da maquete (painéis, portais, móveis, balões, boleiras, neon, escada e bandejas).
-                  Informe o preço de cada um uma vez — ele fica memorizado neste projeto. Adicione itens avulsos como frete e montagem.
-                  Tudo é salvo automaticamente.
-                </p>
+            <aside className="lg:col-span-4 order-2 lg:order-1 print:hidden flex flex-col gap-4 lg:sticky lg:top-[124px]">
+              <div className="bg-fd-surface p-5 rounded-2xl border border-fd-line">
+                <p className="text-sm text-fd-muted">Total do orçamento</p>
+                <p className="text-3xl font-bold text-fd-ink mt-1" data-testid="aside-total">{brl(total)}</p>
+                <p className="text-sm text-fd-muted mt-1">{(proposal.items || []).filter((i) => i.qty > 0).length} itens · salvo automaticamente</p>
+                <button onClick={() => setTab("share")} className="mt-4 w-full min-h-[48px] rounded-xl bg-fd-primary hover:bg-fd-primary-strong text-white font-semibold flex items-center justify-center gap-2">
+                  <Send className="w-4 h-4" /> Enviar ao cliente
+                </button>
               </div>
-            </section>
-            <section className="lg:col-span-7 order-1 lg:order-2">
+              <div className="bg-fd-surface p-5 rounded-2xl border border-fd-line text-sm text-fd-muted leading-relaxed">
+                <p className="font-semibold text-fd-ink mb-1">Como funciona</p>
+                Os itens são contados a partir do cenário: painéis, portais, móveis, balões, boleiras, neon, escadas e bandejas.
+                Informe o preço de cada um uma vez; ele fica guardado neste projeto. Inclua frete e montagem como itens avulsos.
+              </div>
+            </aside>
+            <section className="fd-legacy lg:col-span-8 order-1 lg:order-2 min-w-0">
               <ClientProposal
                 state={state}
                 activeTheme={activeTheme}
@@ -403,29 +417,48 @@ export default function Editor({ project, aiConfigured, onBack }: Props) {
                 onResyncItems={() => setProposal((p) => syncQuoteItems(p, state))}
               />
             </section>
+            <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-fd-surface/95 backdrop-blur border-t border-fd-line px-4 py-2 flex items-center gap-3 print:hidden">
+              <div className="flex-1">
+                <p className="text-xs text-fd-muted">Total</p>
+                <p className="text-lg font-bold">{brl(total)}</p>
+              </div>
+              <button onClick={() => setTab("share")} className="min-h-[48px] px-5 rounded-xl bg-fd-primary text-white font-semibold flex items-center gap-2">
+                <Send className="w-4 h-4" /> Enviar
+              </button>
+            </div>
           </>
         )}
 
         {tab === "share" && (
-          <section className="lg:col-span-12 order-2 max-w-xl w-full mx-auto flex flex-col gap-3">
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4">
-              <p className="text-sm text-slate-400">Cliente</p>
-              <p className="text-lg font-bold">{proposal.clientName || "—"}</p>
-              <p className="text-sm text-slate-400 mt-2">Total do orçamento</p>
-              <p className="text-2xl font-black text-emerald-400" data-testid="share-total">{brl(quoteTotal(proposal))}</p>
+          <section className="lg:col-span-12 order-2 max-w-2xl w-full mx-auto flex flex-col gap-4 py-2">
+            <div className="bg-fd-surface rounded-2xl border border-fd-line p-5 flex items-center gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-fd-muted">Cliente</p>
+                <p className="text-lg font-semibold truncate">{proposal.clientName || "Sem nome definido"}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-fd-muted">Total</p>
+                <p className="text-2xl font-bold text-fd-primary-strong" data-testid="share-total">{brl(total)}</p>
+              </div>
             </div>
-            <button onClick={exportJpg} className="min-h-[56px] rounded-2xl bg-emerald-500 text-slate-950 font-black flex items-center justify-center gap-2">
-              <Download className="w-5 h-5" /> Baixar imagem da maquete (JPG)
-            </button>
-            <button onClick={() => openWhatsApp(proposal)} className="min-h-[56px] rounded-2xl bg-green-600 text-white font-black flex items-center justify-center gap-2">
-              <MessageCircle className="w-5 h-5" /> Enviar orçamento pelo WhatsApp
-            </button>
-            <button onClick={printProposal} className="min-h-[56px] rounded-2xl bg-slate-800 text-white font-bold flex items-center justify-center gap-2">
-              <Printer className="w-5 h-5" /> Imprimir ou salvar PDF do orçamento
-            </button>
-            <p className="text-xs text-slate-500">
-              Dica: no celular, o botão “Enviar p/ Cliente (Zap)” do palco compartilha a foto da maquete direto pelo WhatsApp.
-            </p>
+            {[
+              { title: "Imagem do cenário", desc: "Foto do cenário montado em JPG, pronta para enviar ou postar.", icon: <ImageDown className="w-6 h-6" />, label: "Baixar imagem do cenário (JPG)", onClick: exportJpg, primary: true },
+              { title: "Orçamento pelo WhatsApp", desc: "Mensagem com itens, valores, data e local do evento.", icon: <MessageCircle className="w-6 h-6" />, label: "Enviar orçamento pelo WhatsApp", onClick: () => openWhatsApp(proposal) },
+              { title: "PDF ou impressão", desc: "Proposta formatada para imprimir ou salvar em PDF.", icon: <Printer className="w-6 h-6" />, label: "Imprimir ou salvar PDF do orçamento", onClick: printProposal },
+            ].map((a) => (
+              <div key={a.title} className="bg-fd-surface rounded-2xl border border-fd-line p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+                <div className="flex items-start gap-3 flex-1">
+                  <span className="w-11 h-11 rounded-xl bg-fd-primary-soft text-fd-primary-strong flex items-center justify-center shrink-0">{a.icon}</span>
+                  <div>
+                    <p className="font-semibold">{a.title}</p>
+                    <p className="text-sm text-fd-muted">{a.desc}</p>
+                  </div>
+                </div>
+                <button onClick={a.onClick} className={`min-h-[48px] px-4 rounded-xl font-semibold text-sm ${a.primary ? "bg-fd-primary hover:bg-fd-primary-strong text-white" : "border border-fd-line hover:bg-fd-soft"}`}>
+                  {a.label}
+                </button>
+              </div>
+            ))}
           </section>
         )}
       </main>

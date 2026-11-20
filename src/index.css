@@ -1,5 +1,221 @@
 @import "tailwindcss";
 
+/* ===== FestDecor3D — identidade visual (tokens) ===== */
+@theme {
+  --color-fd-bg: #F8F7FC;
+  --color-fd-surface: #FFFFFF;
+  --color-fd-soft: #F3F0FA;
+  --color-fd-line: #E7E2F0;
+  --color-fd-ink: #262238;
+  --color-fd-muted: #6B6580;
+  --color-fd-primary: #7C3AED;
+  --color-fd-primary-strong: #6D28D9;
+  --color-fd-primary-soft: #EDE9FE;
+  --color-fd-coral: #F0607A;
+  --color-fd-coral-soft: #FFE8EC;
+  --color-fd-gold: #C99A3D;
+  --font-sans: "Inter", "Segoe UI", Roboto, system-ui, -apple-system, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+}
+
+/* Valores originais da paleta (o palco e a folha impressa continuam com as cores reais). */
+:root {
+  --fd-o-slate-50: var(--color-slate-50);
+  --fd-o-slate-100: var(--color-slate-100);
+  --fd-o-slate-200: var(--color-slate-200);
+  --fd-o-slate-300: var(--color-slate-300);
+  --fd-o-slate-400: var(--color-slate-400);
+  --fd-o-slate-500: var(--color-slate-500);
+  --fd-o-slate-600: var(--color-slate-600);
+  --fd-o-slate-700: var(--color-slate-700);
+  --fd-o-slate-800: var(--color-slate-800);
+  --fd-o-slate-900: var(--color-slate-900);
+  --fd-o-slate-950: var(--color-slate-950);
+  --fd-o-emerald-50: var(--color-emerald-50);
+  --fd-o-emerald-100: var(--color-emerald-100);
+  --fd-o-emerald-200: var(--color-emerald-200);
+  --fd-o-emerald-300: var(--color-emerald-300);
+  --fd-o-emerald-400: var(--color-emerald-400);
+  --fd-o-emerald-500: var(--color-emerald-500);
+  --fd-o-emerald-600: var(--color-emerald-600);
+  --fd-o-emerald-700: var(--color-emerald-700);
+  --fd-o-emerald-800: var(--color-emerald-800);
+  --fd-o-emerald-900: var(--color-emerald-900);
+  --fd-o-emerald-950: var(--color-emerald-950);
+  --fd-o-teal-300: var(--color-teal-300);
+  --fd-o-teal-400: var(--color-teal-400);
+  --fd-o-teal-500: var(--color-teal-500);
+  --fd-o-teal-600: var(--color-teal-600);
+  --fd-o-teal-900: var(--color-teal-900);
+  --fd-o-teal-950: var(--color-teal-950);
+  --fd-o-indigo-300: var(--color-indigo-300);
+  --fd-o-indigo-400: var(--color-indigo-400);
+  --fd-o-indigo-500: var(--color-indigo-500);
+  --fd-o-indigo-900: var(--color-indigo-900);
+  --fd-o-indigo-950: var(--color-indigo-950);
+  --fd-o-amber-200: var(--color-amber-200);
+  --fd-o-amber-300: var(--color-amber-300);
+  --fd-o-amber-400: var(--color-amber-400);
+  --fd-o-amber-900: var(--color-amber-900);
+  --fd-o-amber-950: var(--color-amber-950);
+  --fd-o-rose-200: var(--color-rose-200);
+  --fd-o-rose-300: var(--color-rose-300);
+  --fd-o-rose-400: var(--color-rose-400);
+  --fd-o-rose-900: var(--color-rose-900);
+  --fd-o-rose-950: var(--color-rose-950);
+  --fd-o-pink-200: var(--color-pink-200);
+  --fd-o-pink-300: var(--color-pink-300);
+  --fd-o-pink-400: var(--color-pink-400);
+  --fd-o-pink-900: var(--color-pink-900);
+  --fd-o-pink-950: var(--color-pink-950);
+  --fd-o-red-200: var(--color-red-200);
+  --fd-o-red-300: var(--color-red-300);
+  --fd-o-red-400: var(--color-red-400);
+  --fd-o-red-900: var(--color-red-900);
+  --fd-o-red-950: var(--color-red-950);
+  --fd-o-blue-400: var(--color-blue-400);
+}
+
+html, body { background: var(--color-fd-bg); color: var(--color-fd-ink); }
+body { font-size: 16px; -webkit-font-smoothing: antialiased; }
+
+/* Componentes legados do editor: paleta escura convertida em tema claro por tokens. */
+.fd-legacy {
+  --color-slate-50: #1F1B2E;
+  --color-slate-100: #262238;
+  --color-slate-200: #2F2A42;
+  --color-slate-300: #403A55;
+  --color-slate-400: #585170;
+  --color-slate-500: #6B6580;
+  --color-slate-600: #8F89A3;
+  --color-slate-700: #D9D4E5;
+  --color-slate-800: #E7E2F0;
+  --color-slate-900: #FFFFFF;
+  --color-slate-950: #F8F7FC;
+  --color-emerald-50: #3B0764;
+  --color-emerald-100: #4C1D95;
+  --color-emerald-200: #5B21B6;
+  --color-emerald-300: #6D28D9;
+  --color-emerald-400: #7C3AED;
+  --color-emerald-500: #7C3AED;
+  --color-emerald-600: #6D28D9;
+  --color-emerald-700: #5B21B6;
+  --color-emerald-800: #DDD6FE;
+  --color-emerald-900: #EDE9FE;
+  --color-emerald-950: #F5F3FF;
+  --color-teal-300: #9333EA;
+  --color-teal-400: #A855F7;
+  --color-teal-500: #A855F7;
+  --color-teal-600: #9333EA;
+  --color-teal-900: #F3E8FF;
+  --color-teal-950: #FAF5FF;
+  --color-indigo-300: #4338CA;
+  --color-indigo-400: #4F46E5;
+  --color-indigo-500: #6366F1;
+  --color-indigo-900: #E0E7FF;
+  --color-indigo-950: #EEF2FF;
+  --color-amber-200: #92400E;
+  --color-amber-300: #B45309;
+  --color-amber-400: #C2410C;
+  --color-amber-900: #FEF3C7;
+  --color-amber-950: #FFFBEB;
+  --color-rose-200: #9F1239;
+  --color-rose-300: #BE123C;
+  --color-rose-400: #E11D48;
+  --color-rose-900: #FFE4E6;
+  --color-rose-950: #FFF1F2;
+  --color-pink-200: #9D174D;
+  --color-pink-300: #BE185D;
+  --color-pink-400: #DB2777;
+  --color-pink-900: #FCE7F3;
+  --color-pink-950: #FDF2F8;
+  --color-red-200: #991B1B;
+  --color-red-300: #B91C1C;
+  --color-red-400: #DC2626;
+  --color-red-900: #FEE2E2;
+  --color-red-950: #FEF2F2;
+  --color-blue-400: #4F46E5;
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.35;
+  color: var(--color-fd-ink);
+}
+.fd-legacy .uppercase { text-transform: none; letter-spacing: normal; }
+.fd-legacy .tracking-wider, .fd-legacy .tracking-widest { letter-spacing: normal; }
+.fd-legacy input:not([type=range]):not([type=checkbox]):not([type=color]):not([type=radio]),
+.fd-legacy select, .fd-legacy textarea { font-size: 16px; }
+.fd-legacy .shadow-xl, .fd-legacy .shadow-2xl { box-shadow: 0 1px 2px rgb(38 34 56 / .05), 0 4px 14px rgb(38 34 56 / .05); }
+.fd-legacy .animate-pulse:not(.fd-canvas *) { animation: none; }
+
+/* Palco, objetos e folha impressa: cores reais preservadas (inclusive no JPG). */
+.fd-canvas, .fd-legacy .fd-canvas {
+  --color-slate-50: var(--fd-o-slate-50);
+  --color-slate-100: var(--fd-o-slate-100);
+  --color-slate-200: var(--fd-o-slate-200);
+  --color-slate-300: var(--fd-o-slate-300);
+  --color-slate-400: var(--fd-o-slate-400);
+  --color-slate-500: var(--fd-o-slate-500);
+  --color-slate-600: var(--fd-o-slate-600);
+  --color-slate-700: var(--fd-o-slate-700);
+  --color-slate-800: var(--fd-o-slate-800);
+  --color-slate-900: var(--fd-o-slate-900);
+  --color-slate-950: var(--fd-o-slate-950);
+  --color-emerald-50: var(--fd-o-emerald-50);
+  --color-emerald-100: var(--fd-o-emerald-100);
+  --color-emerald-200: var(--fd-o-emerald-200);
+  --color-emerald-300: var(--fd-o-emerald-300);
+  --color-emerald-400: var(--fd-o-emerald-400);
+  --color-emerald-500: var(--fd-o-emerald-500);
+  --color-emerald-600: var(--fd-o-emerald-600);
+  --color-emerald-700: var(--fd-o-emerald-700);
+  --color-emerald-800: var(--fd-o-emerald-800);
+  --color-emerald-900: var(--fd-o-emerald-900);
+  --color-emerald-950: var(--fd-o-emerald-950);
+  --color-teal-300: var(--fd-o-teal-300);
+  --color-teal-400: var(--fd-o-teal-400);
+  --color-teal-500: var(--fd-o-teal-500);
+  --color-teal-600: var(--fd-o-teal-600);
+  --color-teal-900: var(--fd-o-teal-900);
+  --color-teal-950: var(--fd-o-teal-950);
+  --color-indigo-300: var(--fd-o-indigo-300);
+  --color-indigo-400: var(--fd-o-indigo-400);
+  --color-indigo-500: var(--fd-o-indigo-500);
+  --color-indigo-900: var(--fd-o-indigo-900);
+  --color-indigo-950: var(--fd-o-indigo-950);
+  --color-amber-200: var(--fd-o-amber-200);
+  --color-amber-300: var(--fd-o-amber-300);
+  --color-amber-400: var(--fd-o-amber-400);
+  --color-amber-900: var(--fd-o-amber-900);
+  --color-amber-950: var(--fd-o-amber-950);
+  --color-rose-200: var(--fd-o-rose-200);
+  --color-rose-300: var(--fd-o-rose-300);
+  --color-rose-400: var(--fd-o-rose-400);
+  --color-rose-900: var(--fd-o-rose-900);
+  --color-rose-950: var(--fd-o-rose-950);
+  --color-pink-200: var(--fd-o-pink-200);
+  --color-pink-300: var(--fd-o-pink-300);
+  --color-pink-400: var(--fd-o-pink-400);
+  --color-pink-900: var(--fd-o-pink-900);
+  --color-pink-950: var(--fd-o-pink-950);
+  --color-red-200: var(--fd-o-red-200);
+  --color-red-300: var(--fd-o-red-300);
+  --color-red-400: var(--fd-o-red-400);
+  --color-red-900: var(--fd-o-red-900);
+  --color-red-950: var(--fd-o-red-950);
+  --color-blue-400: var(--fd-o-blue-400);
+  --text-xs: 0.75rem;
+  --text-xs--line-height: calc(1 / 0.75);
+}
+.fd-canvas .uppercase { text-transform: uppercase; }
+
+/* Grupos recolhíveis do painel de propriedades */
+.fd-group-body > div > h4:first-child,
+.fd-group-body > div > span:first-child,
+.fd-group-body > div > :first-child > h4,
+.fd-group-body > div > :first-child > svg:first-child { display: none; }
+.fd-group-body > div > :first-child:has(> h4):not(:has(> :not(h4, svg))) { display: none; }
+
+:focus-visible { outline: 3px solid color-mix(in oklab, var(--color-fd-primary) 55%, transparent); outline-offset: 2px; border-radius: 10px; }
+
 /* Celular: o palco fica fixo no topo; ao focar/rolar até um controle, ele aparece abaixo do palco. */
 @media (max-width: 1023px) {
   main section button,
@@ -15,3 +231,8 @@
 @media print {
   body { background: #fff !important; }
 }
+.fd-group-body > div > :first-child > div:first-child:has(> h4) { display: none; }
+
+/* Microtextos dos componentes legados: tamanho mínimo legível (fora do palco e da folha impressa). */
+.fd-legacy :is([class*="text-[8px]"], [class*="text-[9px]"], [class*="text-[9.5px]"], [class*="text-[10px]"], [class*="text-[10.5px]"]):not(.fd-canvas, .fd-canvas *) { font-size: 12.5px; line-height: 1.35; }
+.fd-legacy [class*="text-[11px]"]:not(.fd-canvas, .fd-canvas *) { font-size: 13px; }

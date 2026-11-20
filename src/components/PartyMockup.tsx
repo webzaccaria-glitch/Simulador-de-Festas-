@@ -4540,108 +4540,78 @@ export default function PartyMockup({ state, activeTheme, onUpdateState }: Party
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 rounded-2xl border border-slate-800 shadow-2xl overflow-hidden relative group">
-      {/* Visual Header / Controls */}
-      <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-slate-800 bg-slate-950/60 flex flex-col gap-2 sm:flex-row sm:items-center justify-between z-10">
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <h3 className="font-sans font-semibold text-slate-200 text-xs sm:text-sm tracking-tight truncate mr-1">
-            Maquete Interativa 3D de Decoração
-          </h3>
+    <div className="flex flex-col h-full bg-fd-surface rounded-2xl border border-fd-line shadow-[0_1px_3px_rgb(38_34_56/0.06)] overflow-hidden relative group">
+      {/* Barra do palco: ações principais, compacta e clara */}
+      <div className="shrink-0 px-2 py-1.5 sm:px-3 border-b border-fd-line bg-fd-surface flex items-center gap-1 overflow-x-auto z-10 text-fd-ink" role="toolbar" aria-label="Ações do cenário">
+        <button
+          onClick={() => handleExportImage(true)}
+          className="shrink-0 min-h-[40px] px-3 rounded-xl bg-fd-primary hover:bg-fd-primary-strong text-white text-sm font-semibold flex items-center gap-1.5"
+          title="Baixar a imagem do cenário em JPG"
+        >
+          <Download className="w-4 h-4" />
+          <span>Baixar imagem (JPG)</span>
+        </button>
+        <button
+          onClick={() => handleExportImage(false)}
+          className="shrink-0 min-h-[40px] px-3 rounded-xl hover:bg-fd-soft text-sm font-medium flex items-center gap-1.5"
+          title="Compartilhar a imagem do cenário"
+        >
+          <Share2 className="w-4 h-4 text-fd-primary" />
+          <span className="hidden sm:inline">Enviar ao cliente</span>
+        </button>
+        <span className="mx-1 h-6 w-px bg-fd-line shrink-0" aria-hidden="true" />
+        <button
+          onClick={() => onUpdateState({ gridVisible: !state.gridVisible })}
+          aria-pressed={!!state.gridVisible}
+          className={`shrink-0 min-h-[40px] px-2.5 rounded-xl text-sm font-medium flex items-center gap-1.5 ${state.gridVisible ? "bg-fd-primary-soft text-fd-primary-strong" : "hover:bg-fd-soft"}`}
+          title="Mostrar medidas"
+        >
+          <Grid className="w-4 h-4" />
+          <span className="hidden md:inline">Medidas</span>
+        </button>
+        <button
+          onClick={() => onUpdateState({ guideLineVisible: state.guideLineVisible === false ? true : false })}
+          aria-pressed={state.guideLineVisible !== false}
+          className={`shrink-0 min-h-[40px] px-2.5 rounded-xl text-sm font-medium flex items-center gap-1.5 ${state.guideLineVisible !== false ? "bg-fd-primary-soft text-fd-primary-strong" : "hover:bg-fd-soft"}`}
+          title="Linha de centro para alinhar"
+        >
+          <SeparatorVertical className="w-4 h-4" />
+          <span className="hidden md:inline">Centro</span>
+        </button>
+        <button
+          onClick={() => setCameraLocked(!cameraLocked)}
+          aria-pressed={cameraLocked}
+          className={`shrink-0 min-h-[40px] px-2.5 rounded-xl text-sm font-medium flex items-center gap-1.5 ${cameraLocked ? "bg-fd-coral-soft text-[#B4233F]" : "hover:bg-fd-soft"}`}
+          title={cameraLocked ? "Zoom e movimento travados" : "Travar zoom e movimento"}
+        >
+          {cameraLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+          <span className="hidden md:inline">{cameraLocked ? "Travado" : "Travar"}</span>
+        </button>
+        {(state.cylinderCustomPos || state.panels) && (
           <button
-            onClick={() => setCameraLocked(!cameraLocked)}
-            className={`flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold transition-all border shrink-0 cursor-pointer ${
-              cameraLocked
-                ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
-                : "bg-slate-800 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-700"
-            }`}
-            title={cameraLocked ? "Movimento da maquete bloqueado" : "Movimento da maquete livre"}
+            onClick={() => {
+              // Recentraliza os painéis existentes mantendo IDs, imagens e medidas (antes apagava a lista e quebrava a seleção).
+              const current = getActivePanels(state);
+              onUpdateState({
+                cylinderCustomPos: undefined,
+                panels: current.map((p, idx) => ({ ...p, x: ((340 - p.w) / 2) + (idx - (current.length - 1) / 2) * 45, y: 64 })),
+                selectedPanelId: null
+              });
+            }}
+            className="shrink-0 min-h-[40px] px-2.5 rounded-xl text-sm font-medium flex items-center gap-1.5 hover:bg-fd-soft ml-auto"
+            title="Reorganizar: recentralizar painéis e mesas"
           >
-            {cameraLocked ? (
-              <>
-                <Lock className="w-3 h-3 text-amber-400" />
-                <span>Zoom Bloqueado</span>
-              </>
-            ) : (
-              <>
-                <Unlock className="w-3 h-3 text-slate-400" />
-                <span>Zoom Livre</span>
-              </>
-            )}
+            <Move className="w-4 h-4" />
+            <span className="hidden lg:inline">Reorganizar</span>
           </button>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {(state.cylinderCustomPos || state.panels) && (
-            <button
-              onClick={() => {
-                // Recentraliza os painéis existentes mantendo IDs, imagens e medidas (antes apagava a lista e quebrava a seleção).
-                const current = getActivePanels(state);
-                onUpdateState({
-                  cylinderCustomPos: undefined,
-                  panels: current.map((p, idx) => ({ ...p, x: ((340 - p.w) / 2) + (idx - (current.length - 1) / 2) * 45, y: 64 })),
-                  selectedPanelId: null
-                });
-              }}
-              className="flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 hover:border-rose-500/50 transition-colors"
-              title="Restaurar posições e tamanhos originais"
-            >
-              <Move className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-              <span>Resetar Layout</span>
-            </button>
-          )}
-          <button
-            onClick={() => handleExportImage(true)}
-            className="flex items-center gap-1.5 px-3 py-1 sm:px-3.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 transition-all cursor-pointer active:scale-95 shadow-md shadow-emerald-500/15"
-            title="Baixar imagem da maquete diretamente em formato JPG"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Baixar Imagem (JPG)</span>
-          </button>
-          <button
-            onClick={() => handleExportImage(false)}
-            className="flex items-center gap-1.5 px-2.5 py-1 sm:px-3 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-750 transition-all cursor-pointer active:scale-95"
-            title="Exportar maquete como imagem e compartilhar"
-          >
-            <Share2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Enviar p/ Cliente (Zap)</span>
-          </button>
-          <button
-            onClick={() => onUpdateState({ gridVisible: !state.gridVisible })}
-            className={`flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium border transition-colors ${
-              state.gridVisible 
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
-                : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300"
-            }`}
-          >
-            <Grid className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-            <span>Medidas</span>
-          </button>
-          <button
-            onClick={() => onUpdateState({ guideLineVisible: state.guideLineVisible === false ? true : false })}
-            className={`flex items-center gap-1.5 px-2 py-1 sm:px-2.5 sm:py-1 rounded-md text-[10px] sm:text-xs font-medium border transition-colors ${
-              state.guideLineVisible !== false 
-                ? "bg-indigo-500/10 border-indigo-500/30 text-indigo-400" 
-                : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300"
-            }`}
-            title="Mostrar ou ocultar a Linha Guia de Centro para alinhamento"
-          >
-            <SeparatorVertical className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-            <span>Linha Centro</span>
-          </button>
-          <span className="text-[9px] sm:text-[10px] text-slate-400 font-medium hidden md:flex items-center gap-1 bg-slate-900 border border-slate-800 px-2 py-0.5 rounded-md select-none">
-            🖱️ Scroll para Zoom
-          </span>
-          <span className="text-[10px] sm:text-xs font-mono px-1.5 py-0.5 rounded bg-slate-800/80 border border-slate-700 text-emerald-400">
-            Escala: 1:15
-          </span>
-        </div>
+        )}
       </div>
 
       {/* Main Simulated Scene */}
       <div 
         ref={stageRef}
         id="party-preview-stage"
-        className="flex-1 w-full bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden flex flex-col items-center justify-end pb-32 cursor-default select-none"
+        className="fd-canvas flex-1 w-full bg-gradient-to-b from-[#EEEBF4] via-[#F7F5FA] to-[#E6E1EE] relative overflow-hidden flex flex-col items-center justify-end pb-32 cursor-default select-none"
         style={{ minHeight: "360px", touchAction: "none" }}
         onClick={(e) => {
           if (e.target === e.currentTarget) {

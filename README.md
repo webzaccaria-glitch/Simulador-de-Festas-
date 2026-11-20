@@ -28,6 +28,7 @@ npm start               # NODE_ENV=production, porta $PORT (padrão 3000), dados
 npm run lint            # TypeScript
 npm test                # build + testes de API (isolamento, reinício, SSRF, IA, OAuth, lixeira, versão)
 npm run test:e2e        # navegador (celular): fluxo completo, portal, desfazer/refazer, JPG, PWA
+npm run test:visual     # 4 larguras × 6 categorias: nada cortado, contraste mínimo
 ```
 
 ## Variáveis de ambiente
@@ -41,7 +42,8 @@ avisa que está indisponível; sem `GOOGLE_CLIENT_ID/SECRET` só a conta de demo
 ## Deploy (contêiner)
 
 - `Dockerfile` pronto (porta 8080, `DATA_DIR=/data`, healthcheck em `/api/health`).
-- `fly.toml` (Fly.io com volume) e `render.yaml` (Render com disco) incluídos — exigem conta do proprietário.
+- **Google Cloud (recomendado):** VM do Compute Engine com disco persistente + Caddy (HTTPS). Passo a passo em `docs/deploy-gcp.md` e arquivos em `deploy/gcp/`. Cloud Run não serve para SQLite (disco efêmero).
+- `fly.toml` (Fly.io com volume) e `render.yaml` (Render com disco) também incluídos — exigem conta do proprietário.
 
 ## Android
 

@@ -40,7 +40,7 @@ export default function App() {
   };
 
   if (user === undefined) {
-    return <div className="min-h-screen bg-slate-950 text-slate-400 flex items-center justify-center">Carregando…</div>;
+    return <div className="min-h-screen bg-fd-bg text-fd-muted flex items-center justify-center">Carregando…</div>;
   }
   if (!user) {
     return <LoginScreen googleAvailable={config.google} demoAvailable={config.demo && !config.serverDown} serverDown={config.serverDown} onLoggedIn={loadMe} />;

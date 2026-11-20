@@ -1,13 +1,15 @@
 // Gera os ícones PNG do PWA a partir de um SVG (usa o Chromium do Playwright).
 const { chromium } = require("playwright");
 const path = require("path");
-const svg = (pad) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-<defs><linearGradient id="g" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#059669"/><stop offset=".5" stop-color="#14b8a6"/><stop offset="1" stop-color="#fbbf24"/></linearGradient></defs>
-<rect width="512" height="512" rx="${pad ? 0 : 112}" fill="${pad ? "#020617" : "url(#g)"}"/>
-${pad ? '<rect x="56" y="56" width="400" height="400" rx="96" fill="url(#g)"/>' : ""}
-<circle cx="256" cy="230" r="${pad ? 92 : 120}" fill="none" stroke="#020617" stroke-width="${pad ? 22 : 28}"/>
-<rect x="${pad ? 176 : 150}" y="${pad ? 330 : 360}" width="${pad ? 160 : 212}" height="${pad ? 34 : 44}" rx="12" fill="#020617"/>
-</svg>`;
+// Marca FestDecor3D: arco de painel com painel redondo coral, sobre violeta.
+const svg = (pad) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+<rect width="48" height="48" rx="${pad ? 0 : 11}" fill="#7C3AED"/>
+<g transform="${pad ? "translate(7.2 7.2) scale(0.7)" : ""}">
+<path d="M11 38V24a13 13 0 0 1 26 0v14" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+<circle cx="24" cy="25" r="6.5" fill="#F0607A"/>
+<path d="M8 38h32" stroke="#fff" stroke-width="3.2" stroke-linecap="round"/>
+<circle cx="35.5" cy="12.5" r="2.4" fill="#FCD34D"/>
+</g></svg>`;
 (async () => {
   const out = path.join(__dirname, "..", "public", "icons");
   const b = await chromium.launch();
