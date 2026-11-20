@@ -407,7 +407,7 @@ export default function Editor({ project, aiConfigured, onBack }: Props) {
                 Informe o preço de cada um uma vez; ele fica guardado neste projeto. Inclua frete e montagem como itens avulsos.
               </div>
             </aside>
-            <section className="fd-legacy lg:col-span-8 order-1 lg:order-2 min-w-0">
+            <section className="fd-legacy lg:col-span-8 order-1 lg:order-2 min-w-0 pb-24 lg:pb-0">
               <ClientProposal
                 state={state}
                 activeTheme={activeTheme}
